@@ -12,7 +12,7 @@ import base64
 import binascii
 import string
 
-class Vipersvc(ServiceBase):
+class MacroMagnet(ServiceBase):
     SERVICE_CATEGORY = 'Static Analysis'
     SERVICE_ACCEPTS = '(document/.*|code/xml)'
     SERIVCE_DESCRIPTION = 'Office File VBA Macro Magnet'
@@ -25,10 +25,10 @@ class Vipersvc(ServiceBase):
 
 
     def __init__(self, cfg=None):
-        super(Vipersvc, self).__init__(cfg)
+        super(MacroMagnet, self).__init__(cfg)
 
     def start(self):
-        self.log.debug('Vipersvc service started')
+        self.log.debug('MacroMagnet service started')
 
     def execute(self, request):
         self.result = Result()
@@ -142,14 +142,14 @@ class Vipersvc(ServiceBase):
 
         # if URL's have been found, add them to the service results
         if url_list:
-            domain_section = ResultSection(SCORE['LOW'], "Vipermonkey has found these domain names:", parent=self.result)
+            domain_section = ResultSection(SCORE['LOW'], "MacroMagnet has found these domain names:", parent=self.result)
             for url in url_list:
                 domain_section.add_line(url + "\n")
                 self.result.add_tag(TAG_TYPE.NET_FULL_URI, url, TAG_WEIGHT.MED)
 
         # if IP addresses have been detected, add them to the service results
         if ip_list:
-            ip_section = ResultSection(SCORE['LOW'], "Vipermonkey has found these IP addresses:", parent=self.result)
+            ip_section = ResultSection(SCORE['LOW'], "MacroMagnet has found these IP addresses:", parent=self.result)
             for ip in ip_list:
                 ipstr = ''.join(ip)
                 ip_section.add_line(ipstr)
