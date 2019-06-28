@@ -99,14 +99,11 @@ class MacroMagnet(ServiceBase):
                         param = action[1]
 
                     # Parameters have been seen as base64 encoded, account for this
-                    (b64_results, decoded) = self.check_for_b64(param)
+                    (b64_results, decoded) = self.check_for_b64(param, sub_action_section)
 
                     # If decoded is True, base64 code was found in param
                     # b64_results parameter with decoded base64
                     if decoded:
-                        #b64_results = b64_results.decode('utf-16').encode('ascii', 'ignore')
-                        sub_action_section.add_line('Possible Base64 Decoded Parameters: %s' % b64_results)
-                        sub_action_section.add_line('\nOriginal Parameters: %s' % param)
                         (new_urls, new_ips) = self.find_ip(b64_results)
                         if new_urls:
                             url_list.extend(new_urls)
@@ -115,12 +112,6 @@ class MacroMagnet(ServiceBase):
                         # Empty lists to reduce duplicates
                         new_urls = []
                         new_ips = []
-                        # Some parameters are very long, splice if necessary (max tag size is 1000)
-                        if len(param) > 50:
-                            tag_name = param[:50]
-                        else:
-                            tag_name = param
-                        self.result.add_tag(TAG_TYPE.BASE64_ALPHABET, tag_name, TAG_WEIGHT.MED)
                     else:
                         sub_action_section.add_line('Parameters: %s' % param)
 
@@ -151,7 +142,6 @@ class MacroMagnet(ServiceBase):
         ip_list = re.findall(ip_regex, parameter)
 
         return url_list, ip_list
-
 
     def add_ip_tags(self, url_list, ip_list):
         """
@@ -187,11 +177,12 @@ class MacroMagnet(ServiceBase):
                     else:
                         self.result.add_tag(TAG_TYPE.NET_IP, ipstr, TAG_WEIGHT.MED)
         
-    def check_for_b64(self, data):
+    def check_for_b64(self, data, section):
         """Search and decode base64 strings in sample data.
 
         Args:
-            data: Data to be searched.
+            data: Data to be parsed
+            section: Sub-section for data to be added to 
 
         Returns:
             decoded_param: Decoded base64 string if found
@@ -203,7 +194,9 @@ class MacroMagnet(ServiceBase):
         b64_extracted = set()
         b64_res = None
         b64_matches = []
+        # b64_matches_raw will be used for replacing in case b64_matches are modified
         b64_matches_raw = []
+        b64_tag = ''
         b64_ascii_content = []
         base64data = None
         base64_decoded_list = []
@@ -218,14 +211,29 @@ class MacroMagnet(ServiceBase):
                 if len(b64) >= 16 and len(b64) % 4 == 0:
                     b64_matches.append(b64)
                     b64_matches_raw.append(b64_match)
-
         for b64_string, b64_string_raw in zip(b64_matches, b64_matches_raw):
             try:
                 base64data = binascii.a2b_base64(b64_string)
+                # Tagging base64, some strings are very long, account for this
+                if len(b64_string) > 50:
+                    b64_tag = b64_string[:50]
+                else:
+                    b64_tag = b64_string
+                self.result.add_tag(TAG_TYPE.BASE64_ALPHABET, b64_tag, TAG_WEIGHT.MED)
                 # Decode base64 bytes, add a space to beginning as it may be stripped off while using regex
                 base64data_decoded = ' ' + base64data.decode('utf-16').encode('ascii', 'ignore')
+                # Replace base64 from param with decoded string
                 decoded_param = re.sub(b64_string_raw, base64data_decoded, decoded_param)
                 decoded = True
             except:
                 pass
+        if decoded:
+            section.add_line('Possible Base64 Decoded Parameters: %s' % decoded_param)
+            section.add_line('\nOriginal Parameters: %s' % data)
         return decoded_param, decoded
+
+
+#sub_action_section.add_line('Possible Base64 Decoded Parameters: %s' % b64_results)
+                        #sub_action_section.add_line('\nOriginal Parameters: %s' % param)
+                        
+                        #(new_urls, new_ips) = self.find_ip(b64_results)
