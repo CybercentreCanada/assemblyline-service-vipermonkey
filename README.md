@@ -13,10 +13,8 @@ MacroMagnet uses ViperMonkey (https://github.com/decalage2/ViperMonkey) for anal
 3. Detected URLs, URIs, and IP addresses.
 
 3. Tags:
-'''
-NET_IP
-NET_FULL_URI
-NET_PORT
-BASE64_ALPHABET
-SHELLCODE
-'''
+    NET_IP
+    NET_FULL_URI
+    NET_PORT
+    BASE64_ALPHABET
+    SHELLCODE
