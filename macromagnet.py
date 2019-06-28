@@ -8,9 +8,8 @@ import os
 import re
 import sys
 import logging
-import base64
 import binascii
-import string
+
 
 class MacroMagnet(ServiceBase):
     SERVICE_CATEGORY = 'Static Analysis'
@@ -22,7 +21,6 @@ class MacroMagnet(ServiceBase):
     SERVICE_STAGE = 'CORE'
     SERVICE_CPU_CORES = 1
     SERVICE_RAM_MB = 512
-
 
     def __init__(self, cfg=None):
         super(MacroMagnet, self).__init__(cfg)
@@ -36,8 +34,8 @@ class MacroMagnet(ServiceBase):
         self.request = request
         self.task = request.task
 
-        ip_list = []
-        url_list = []
+        self.ip_list = []
+        self.url_list = []
 
         # Will store vipermonkey log/output
         log_path = os.path.join(self.working_directory, 'vipermonkey_output.log')
@@ -53,6 +51,7 @@ class MacroMagnet(ServiceBase):
             sys.stdout = log_file
             try:
                 vmonkey_values = vmonkey.process_file(None, al_file, data)
+                # Checking for tuple in case vmonkey return is only None
                 if type(vmonkey_values) == tuple:
                     '''
                     Structure of variable actions is as follows:
@@ -81,16 +80,18 @@ class MacroMagnet(ServiceBase):
             # Creating action section
             action_section = ResultSection(SCORE.NULL, 'Recorded Actions:', parent=self.result)
             for action in actions:    # Creating action sub-sections for each action
-                if action[2] == 'Shell function':
-                    self.result.add_tag(TAG_TYPE.SHELLCODE, action[0], TAG_WEIGHT.MED)
+                cur_action = action[0]
+                cur_description = action[2]
+                if cur_description == 'Shell function':
+                    self.result.add_tag(TAG_TYPE.SHELLCODE, cur_action, TAG_WEIGHT.MED)
                 # Entry point actions have an empty description field, re-organize result section for this case
-                if action[0] == 'Found Entry Point':
+                if cur_action == 'Found Entry Point':
                     sub_action_section = ResultSection(SCORE.LOW, 'Found Entry Point', parent=action_section)
                     sub_action_section.add_line(action[1])
                 else:
                     # Action's description will be the sub-section name
-                    sub_action_section = ResultSection(SCORE.LOW, action[2], parent=action_section)
-                    sub_action_section.add_line('Action: %s' % action[0])
+                    sub_action_section = ResultSection(SCORE.LOW, cur_description, parent=action_section)
+                    sub_action_section.add_line('Action: %s' % cur_action)
 
                     # Parameters are sometimes stored as a list, account for this
                     if isinstance(action[1], list):
@@ -98,32 +99,18 @@ class MacroMagnet(ServiceBase):
                     else:
                         param = action[1]
 
-                    # Parameters have been seen as base64 encoded, account for this
-                    (b64_results, decoded) = self.check_for_b64(param, sub_action_section)
-
-                    # If decoded is True, base64 code was found in param
-                    # b64_results parameter with decoded base64
-                    if decoded:
-                        (new_urls, new_ips) = self.find_ip(b64_results)
-                        if new_urls:
-                            url_list.extend(new_urls)
-                        if new_ips:
-                            ip_list.extend(new_ips)
-                        # Empty lists to reduce duplicates
-                        new_urls = []
-                        new_ips = []
-                    else:
+                    # If decoded is true, possible base64 string has been found
+                    decoded = self.check_for_b64(param, sub_action_section)
+                    # check_for_b64() adds to current section when base64 string found
+                    # if not, add raw parameter to section
+                    if not decoded:
                         sub_action_section.add_line('Parameters: %s' % param)
 
                     # Add urls/ips found in parameter to respective lists
-                    (new_urls, new_ips) = self.find_ip(param)
-                    if new_urls:
-                        url_list.extend(new_urls)
-                    if new_ips:
-                        ip_list.extend(new_ips)
+                    self.find_ip(param)
                         
         # Add url/ip tags
-        self.add_ip_tags(url_list, ip_list)
+        self.add_ip_tags()
 
         # Create section for built-in VBA functions called
         if len(external_functions) > 0:
@@ -134,72 +121,68 @@ class MacroMagnet(ServiceBase):
 
     def find_ip(self, parameter):
         """
-        Takes in a string and returns any urls/ip addresses found in their own list
+        Parses parameter for urls/ip addresses, adds them to their respective lists
         """
 
         url_list = re.findall(r'https?://(?:[-\w.]|(?:[\da-zA-Z/?=%&]))+', parameter)
-        ip_regex = re.compile(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?:\:\d{1,4})?')
-        ip_list = re.findall(ip_regex, parameter)
+        ip_list = re.findall(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?:\:\d{1,4})?', parameter)
 
-        return url_list, ip_list
+        for url in url_list:
+            url_strip = url.strip()
+            if url_strip:
+                self.url_list.append(url_strip)
+        for ip in ip_list:
+            ip_strip = ip.strip()
+            if ip_strip:
+                self.ip_list.append(ip_strip)
 
-    def add_ip_tags(self, url_list, ip_list):
+    def add_ip_tags(self):
         """
         Adds tags for urls and ip addresses from given lists
         """
 
         # If URL's have been found, add them to the service results
-        if url_list:
+        if self.url_list:
             # Remove duplicates
-            url_list = list(dict.fromkeys(url_list))
+            self.url_list = list(dict.fromkeys(self.url_list))
             domain_section = ResultSection(SCORE['LOW'], "MacroMagnet has found these domain names:", parent=self.result)
-            for url in url_list:
-                # Check for empty entry
-                if url.strip():
-                    domain_section.add_line(url)
-                    self.result.add_tag(TAG_TYPE.NET_FULL_URI, url, TAG_WEIGHT.MED)
+            for url in self.url_list:
+                domain_section.add_line(url)
+                self.result.add_tag(TAG_TYPE.NET_FULL_URI, url, TAG_WEIGHT.MED)
 
         # If IP addresses have been found, add them to the service results
-        if ip_list:
-            ip_list = list(dict.fromkeys(ip_list))
+        if self.ip_list:
+            # Remove duplicates
+            self.ip_list = list(dict.fromkeys(self.ip_list))
             ip_section = ResultSection(SCORE['LOW'], "MacroMagnet has found these IP addresses:", parent=self.result)
-            for ip in ip_list:
-                ipstr = str(ip)
-                # Check for empty entry
-                if ip.strip():
-                    ip_section.add_line(ipstr)
-                    # checking if IP ports also found and adding the corresponding tags
-                    if re.findall(":", ipstr):
-                        net_ip, net_port = ipstr.split(':')
-                        self.result.add_tag(TAG_TYPE.NET_FULL_URI, net_ip+':'+net_port)
-                        self.result.add_tag(TAG_TYPE.NET_IP, net_ip, TAG_WEIGHT.MED)
-                        self.result.add_tag(TAG_TYPE.NET_PORT, net_port, TAG_WEIGHT.MED)
-                    else:
-                        self.result.add_tag(TAG_TYPE.NET_IP, ipstr, TAG_WEIGHT.MED)
+            for ip in self.ip_list:
+                ip_str = str(ip)
+                ip_section.add_line(ip_str)
+                # checking if IP ports also found and adding the corresponding tags
+                if re.findall(":", ip_str):
+                    net_ip, net_port = ip_str.split(':')
+                    self.result.add_tag(TAG_TYPE.NET_FULL_URI, net_ip+':'+net_port)
+                    self.result.add_tag(TAG_TYPE.NET_IP, net_ip, TAG_WEIGHT.MED)
+                    self.result.add_tag(TAG_TYPE.NET_PORT, net_port, TAG_WEIGHT.MED)
+                else:
+                    self.result.add_tag(TAG_TYPE.NET_IP, ip_str, TAG_WEIGHT.MED)
         
     def check_for_b64(self, data, section):
         """Search and decode base64 strings in sample data.
 
         Args:
             data: Data to be parsed
-            section: Sub-section for data to be added to 
+            section: Sub-section to be modified if base64 found
 
         Returns:
-            decoded_param: Decoded base64 string if found
             decoded: Boolean which is true if base64 found
-            AL result object and whether entity was extracted (boolean).
         """
-        extract = False
-        b64results = {}
-        b64_extracted = set()
-        b64_res = None
+
         b64_matches = []
         # b64_matches_raw will be used for replacing in case b64_matches are modified
         b64_matches_raw = []
         b64_tag = ''
-        b64_ascii_content = []
         base64data = None
-        base64_decoded_list = []
         decoded_param = data
         decoded = False
 
@@ -230,10 +213,5 @@ class MacroMagnet(ServiceBase):
         if decoded:
             section.add_line('Possible Base64 Decoded Parameters: %s' % decoded_param)
             section.add_line('\nOriginal Parameters: %s' % data)
-        return decoded_param, decoded
-
-
-#sub_action_section.add_line('Possible Base64 Decoded Parameters: %s' % b64_results)
-                        #sub_action_section.add_line('\nOriginal Parameters: %s' % param)
-                        
-                        #(new_urls, new_ips) = self.find_ip(b64_results)
+            self.find_ip(decoded_param)
+        return decoded
