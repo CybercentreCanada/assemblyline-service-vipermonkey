@@ -214,4 +214,5 @@ class MacroMagnet(ServiceBase):
             section.add_line('Possible Base64 Decoded Parameters: %s' % decoded_param)
             section.add_line('\nOriginal Parameters: %s' % data)
             self.find_ip(decoded_param)
+
         return decoded
