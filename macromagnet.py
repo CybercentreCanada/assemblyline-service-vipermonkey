@@ -9,6 +9,7 @@ import re
 import sys
 import logging
 import binascii
+import hashlib
 
 
 class MacroMagnet(ServiceBase):
@@ -36,6 +37,7 @@ class MacroMagnet(ServiceBase):
 
         self.ip_list = []
         self.url_list = []
+        self.found_powershell = False
 
         # Will store vipermonkey log/output
         log_path = os.path.join(self.working_directory, 'vipermonkey_output.log')
@@ -74,7 +76,7 @@ class MacroMagnet(ServiceBase):
             sys.stdout = stdout_saved
 
         # Add vmonkey log as a supplemental file 
-        self.task.add_supplementary(log_path, 'vmonkey log')
+        self.request.add_supplementary(log_path, 'vmonkey log')
 
         if len(actions) > 0:
             # Creating action section
@@ -89,26 +91,45 @@ class MacroMagnet(ServiceBase):
                     sub_action_section = ResultSection(SCORE.LOW, 'Found Entry Point', parent=action_section)
                     sub_action_section.add_line(action[1])
                 else:
-                    # Action's description will be the sub-section name
-                    sub_action_section = ResultSection(SCORE.LOW, cur_description, parent=action_section)
-                    sub_action_section.add_line('Action: %s' % cur_action)
-
                     # Parameters are sometimes stored as a list, account for this
                     if isinstance(action[1], list):
                         param = ', '.join(str(a) for a in action[1])
                     else:
                         param = action[1]
 
+                    # Action's description will be the sub-section name
+                    sub_action_section = ResultSection(SCORE.LOW, cur_description, parent=action_section)
+
+                    sub_action_section.add_line('Action: %s' % cur_action)
+
+
+
+                    sub_action_section.add_line('Parameters: %s' % param)
+
+                    # Parse for powershell call, add param as excracted if found
+                    if re.findall(r'(?:powershell)|(?:pwsh)', param):
+                        self.found_powershell = True
+                        sha256hash = hashlib.sha256(param).hexdigest()
+                        powershell_dir = os.path.join(self.working_directory, '%s_extracted_powershell' % sha256hash[0:25])
+                        with open(powershell_dir, 'w') as f:
+                            f.write(param)
+                            self.request.add_extracted(powershell_dir, 'Discovered PowerShell code inside parameter.')
+                        ResultSection(SCORE.NULL, 'Discovered PowerShell code inside parameter.', parent=sub_action_section)
+
                     # If decoded is true, possible base64 string has been found
                     decoded = self.check_for_b64(param, sub_action_section)
                     # check_for_b64() adds to current section when base64 string found
                     # if not, add raw parameter to section
-                    if not decoded:
-                        sub_action_section.add_line('Parameters: %s' % param)
+                    #if not decoded:
+                    #    sub_action_section.add_line('Parameters: %s' % param)
 
                     # Add urls/ips found in parameter to respective lists
                     self.find_ip(param)
-                        
+                    
+        # Add PowerShell score
+        if self.found_powershell:
+            powershell_section = ResultSection(300, 'Discovered PowerShell code in file.', parent=self.result)
+                    
         # Add url/ip tags
         self.add_ip_tags()
 
@@ -210,10 +231,10 @@ class MacroMagnet(ServiceBase):
                 decoded = True
             except:
                 pass
+
         if decoded:
-            section.add_line('Possible Base64 Decoded Parameters: %s' % decoded_param)
-            section.add_line('\nOriginal Parameters: %s' % data)
-            section.change_score(SCORE.HIGH)
+            decoded_section = ResultSection(SCORE.HIGH, 'Possible Base64 found.', parent=section)
+            decoded_section.add_line('Possible Base64 Decoded Parameters: %s' % decoded_param)
             self.find_ip(decoded_param)
 
         return decoded
