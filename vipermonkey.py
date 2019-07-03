@@ -3,7 +3,7 @@ from assemblyline.al.service.base import ServiceBase
 from assemblyline.al.common.result import Result, ResultSection, SCORE, TAG_TYPE, TAG_WEIGHT, TEXT_FORMAT, TAG_USAGE, \
     TAG_SCORE, Tag
 
-import vipermonkey.vmonkey as vmonkey
+import ViperMonkey.vipermonkey.vmonkey as vmonkey
 import os
 import re
 import sys
@@ -12,7 +12,7 @@ import binascii
 import hashlib
 
 
-class MacroMagnet(ServiceBase):
+class ViperMonkey(ServiceBase):
     SERVICE_CATEGORY = 'Static Analysis'
     SERVICE_ACCEPTS = '(document/.*|code/xml)'
     SERIVCE_DESCRIPTION = 'Office File VBA Macro Magnet'
@@ -24,10 +24,10 @@ class MacroMagnet(ServiceBase):
     SERVICE_RAM_MB = 512
 
     def __init__(self, cfg=None):
-        super(MacroMagnet, self).__init__(cfg)
+        super(ViperMonkey, self).__init__(cfg)
 
     def start(self):
-        self.log.debug('MacroMagnet service started')
+        self.log.debug('ViperMonkey service started')
 
     def execute(self, request):
         self.result = Result()
@@ -43,11 +43,13 @@ class MacroMagnet(ServiceBase):
         # Will store vipermonkey log/output
         log_path = os.path.join(self.working_directory, 'vipermonkey_output.log')
         logging.basicConfig(filename=log_path, level=logging.DEBUG, format='%(levelname)-8s %(message)s')
+        vmonkey_empty = False
 
         al_file = request.download()
         with open(al_file, 'r') as f:
             data = f.read()
 
+        # Running vmonkey
         with open(log_path, 'a') as log_file:
             # Saving stdout as we want stdout going to a vipermonkey log for the vmonkey call
             stdout_saved = sys.stdout
@@ -69,15 +71,17 @@ class MacroMagnet(ServiceBase):
                     actions = vmonkey_values[0]
                     external_functions = vmonkey_values[1]
                 else:
-                    return
+                    vmonkey_empty = True
 
-            except TypeError, error:
-                print >> sys.stderr, 'Exception: %s' % str(error)
-                return
+            except:
+                pass
             sys.stdout = stdout_saved
-
-        # Add vmonkey log as a supplemental file 
+        
+        # Add vmonkey log as a supplemental file
         self.request.add_supplementary(log_path, 'vmonkey log')
+        if vmonkey_empty is True:
+            ResultSection(SCORE.NULL, 'Empty vmonkey results, please check "vipermonkey_output.log"', parent=self.result)
+            return
 
         if len(actions) > 0:
             # Creating action section
@@ -133,8 +137,6 @@ class MacroMagnet(ServiceBase):
             external_func_section = ResultSection(SCORE.NULL, 'VBA functions called', body_format=TEXT_FORMAT.MEMORY_DUMP, parent=self.result)
             external_func_section.add_line('\n'.join(external_functions))
 
-        request.result = self.result
-
     def extract_powershell(self, parameter, section):
         """Searches parameter for PowerShell, adds as extracted if found
 
@@ -182,7 +184,7 @@ class MacroMagnet(ServiceBase):
         if self.url_list:
             # Remove duplicates
             self.url_list = list(dict.fromkeys(self.url_list))
-            domain_section = ResultSection(SCORE['LOW'], "MacroMagnet has found these domain names:", parent=self.result)
+            domain_section = ResultSection(SCORE['LOW'], "ViperMonkey has found these domain names:", parent=self.result)
             for url in self.url_list:
                 domain_section.add_line(url)
                 self.result.add_tag(TAG_TYPE.NET_FULL_URI, url, TAG_WEIGHT.MED)
@@ -191,7 +193,7 @@ class MacroMagnet(ServiceBase):
         if self.ip_list:
             # Remove duplicates
             self.ip_list = list(dict.fromkeys(self.ip_list))
-            ip_section = ResultSection(SCORE['LOW'], "MacroMagnet has found these IP addresses:", parent=self.result)
+            ip_section = ResultSection(SCORE['LOW'], "ViperMonkey has found these IP addresses:", parent=self.result)
             for ip in self.ip_list:
                 ip_str = str(ip)
                 ip_section.add_line(ip_str)

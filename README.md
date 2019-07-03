@@ -1,10 +1,10 @@
-# MacroMagnet Service
+# ViperMonkey Service
 
 This service analyzes and emulates VBA macros contained in Microsoft Office files.
 
 ### Execution
 
-MacroMagnet uses ViperMonkey (https://github.com/decalage2/ViperMonkey) for analysis/emulation. This service will report the following:
+This service uses Decalage's ViperMonkey (https://github.com/decalage2/ViperMonkey) for analysis/emulation. ViperMonkey will report the following:
 
 1. All discovered actions including entry points. Able to decode base64 encoded commands.
 

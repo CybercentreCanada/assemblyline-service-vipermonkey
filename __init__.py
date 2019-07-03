@@ -1,1 +1,1 @@
-from al_services.alsvc_macromagnet.macromagnet import MacroMagnet
+from al_services.alsvc_vipermonkey.vipermonkey import ViperMonkey
