@@ -38,6 +38,7 @@ class MacroMagnet(ServiceBase):
         self.ip_list = []
         self.url_list = []
         self.found_powershell = False
+        self.file_hashes = []
 
         # Will store vipermonkey log/output
         log_path = os.path.join(self.working_directory, 'vipermonkey_output.log')
@@ -86,47 +87,41 @@ class MacroMagnet(ServiceBase):
                 cur_description = action[2]
                 if cur_description == 'Shell function':
                     self.result.add_tag(TAG_TYPE.SHELLCODE, cur_action, TAG_WEIGHT.MED)
+
                 # Entry point actions have an empty description field, re-organize result section for this case
                 if cur_action == 'Found Entry Point':
                     sub_action_section = ResultSection(SCORE.LOW, 'Found Entry Point', parent=action_section)
                     sub_action_section.add_line(action[1])
                 else:
-                    # Parameters are sometimes stored as a list, account for this
-                    if isinstance(action[1], list):
-                        param = ', '.join(str(a) for a in action[1])
-                    else:
-                        param = action[1]
-
                     # Action's description will be the sub-section name
                     sub_action_section = ResultSection(SCORE.LOW, cur_description, parent=action_section)
+                    
+                    # Parameters are sometimes stored as a list, account for this
+                    if isinstance(action[1], list):
+                        for item in action[1]:
+                            # Parameters includes more than strings (booleans for example)
+                            if isinstance(item, str):
+                                # Check for PowerShell
+                                self.extract_powershell(item, sub_action_section)
+                        # Join list items into single string
+                        param = ', '.join(str(a) for a in action[1])
+
+                    else:
+                        param = action[1]
+                        # Parameters includes more than strings (booleans for example)
+                        if isinstance(param, str):
+                            self.extract_powershell(param, sub_action_section)
 
                     sub_action_section.add_line('Action: %s' % cur_action)
-
-
-
                     sub_action_section.add_line('Parameters: %s' % param)
-
-                    # Parse for powershell call, add param as excracted if found
-                    if re.findall(r'(?:powershell)|(?:pwsh)', param):
-                        self.found_powershell = True
-                        sha256hash = hashlib.sha256(param).hexdigest()
-                        powershell_dir = os.path.join(self.working_directory, '%s_extracted_powershell' % sha256hash[0:25])
-                        with open(powershell_dir, 'w') as f:
-                            f.write(param)
-                            self.request.add_extracted(powershell_dir, 'Discovered PowerShell code inside parameter.')
-                        ResultSection(SCORE.NULL, 'Discovered PowerShell code inside parameter.', parent=sub_action_section)
 
                     # If decoded is true, possible base64 string has been found
                     decoded = self.check_for_b64(param, sub_action_section)
-                    # check_for_b64() adds to current section when base64 string found
-                    # if not, add raw parameter to section
-                    #if not decoded:
-                    #    sub_action_section.add_line('Parameters: %s' % param)
 
                     # Add urls/ips found in parameter to respective lists
                     self.find_ip(param)
                     
-        # Add PowerShell score
+        # Add PowerShell score if found
         if self.found_powershell:
             powershell_section = ResultSection(300, 'Discovered PowerShell code in file.', parent=self.result)
                     
@@ -139,6 +134,27 @@ class MacroMagnet(ServiceBase):
             external_func_section.add_line('\n'.join(external_functions))
 
         request.result = self.result
+
+    def extract_powershell(self, parameter, section):
+        """Searches parameter for PowerShell, adds as extracted if found
+
+        Args:
+            parameter: String to be searched
+            section: Section to be modified if PowerShell found
+        """
+
+        if re.findall(r'(?:powershell)|(?:pwsh)', parameter):
+            self.found_powershell = True
+            sha256hash = hashlib.sha256(parameter).hexdigest()
+            ResultSection(SCORE.NULL, 'Discovered PowerShell code in parameter.', parent = section)
+
+            # Account for duplicates
+            if sha256hash not in self.file_hashes:
+                self.file_hashes.append(sha256hash)
+                powershell_dir = os.path.join(self.working_directory, '%s_extracted_powershell' % sha256hash[0:25])
+                with open(powershell_dir, 'w') as f:
+                    f.write(parameter)
+                    self.request.add_extracted(powershell_dir, 'Discovered PowerShell code in parameter.')
 
     def find_ip(self, parameter):
         """
