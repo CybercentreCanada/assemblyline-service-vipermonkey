@@ -1,0 +1,20 @@
+# Dictionary of VBA commands
+
+# Comments can be done by using '#' at the beginning of the line
+
+# Formatting is as follows:  call; description
+# Whitespace is ignored on either side of the call/description
+
+Create; 
+CreateObject; Creates and returns a reference to an ActiveX object.
+Get; Reads data from an open disk file into a variable.
+GetObject; Returns a reference to an object provided by an ActiveX component.
+Open; Enables input/output (I/O) to a file.
+CLng; Convert value to a long integer. Can be used for obfuscation.
+CallByName; Executes a method of an object, or sets or returns a property of an object.
+Chr; Returns a String containing the character associated with the specified character code. Can be used for obfuscation.
+Len; Returns a Long containing the number of characters in a string or the number of bytes required to store a variable.
+Mid; Returns a Variant (String) containing a specified number of characters from a string. Can be used for obfuscation.
+Range; If using excel: Returns a Range object that represents a cell or a range of cells. Used with Sheets to access cells within workbooks
+Run; Runs a macro or calls a function. This can be used to run a macro written in Visual Basic or the Microsoft Office macro languages, or to run a function in a DLL or XLL.
+Sheets; A collection of all the sheets in the specified or active workbook. Can access information within workbooks to avoid detection.

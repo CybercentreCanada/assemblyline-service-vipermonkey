@@ -1,4 +1,3 @@
-
 from assemblyline.al.service.base import ServiceBase
 from assemblyline.al.common.result import Result, ResultSection, SCORE, TAG_TYPE, TAG_WEIGHT, TEXT_FORMAT, TAG_USAGE, \
     TAG_SCORE, Tag
@@ -39,6 +38,7 @@ class ViperMonkey(ServiceBase):
         self.url_list = []
         self.found_powershell = False
         self.file_hashes = []
+        self.decoded = False
 
         # Will store vipermonkey log/output
         log_path = os.path.join(self.working_directory, 'vipermonkey_output.log')
@@ -64,33 +64,33 @@ class ViperMonkey(ServiceBase):
                     action: 'Found Entry Point', 'Execute Command', etc...
                     parameter: Parameters for function
                     description: 'Shell Function', etc...
-                    
+
                     external_functions is a list of built-in VBA functions
                     that were called
                     '''
                     actions = vmonkey_values[0]
                     external_functions = vmonkey_values[1]
                 else:
-                    vmonkey_empty = True
+                    vmonkey_err = True
 
             except:
                 pass
             sys.stdout = stdout_saved
-        
+
         # Add vmonkey log as a supplemental file
         self.request.add_supplementary(log_path, 'vmonkey log')
-        if vmonkey_empty is True:
-            ResultSection(SCORE.NULL, 'Empty vmonkey results, please check "vipermonkey_output.log"', parent=self.result)
+        if vmonkey_err is True:
+            ResultSection(SCORE.NULL, 'ViperMonkey has encountered an error, please check "vipermonkey_output.log"', parent=self.result)
             return
 
+
         if len(actions) > 0:
+            self.result.add_tag(TAG_TYPE.TECHNIQUE_MACROS, 'VBA macro(s) found', TAG_WEIGHT.MED)
             # Creating action section
             action_section = ResultSection(SCORE.NULL, 'Recorded Actions:', parent=self.result)
             for action in actions:    # Creating action sub-sections for each action
                 cur_action = action[0]
                 cur_description = action[2]
-                if cur_description == 'Shell function':
-                    self.result.add_tag(TAG_TYPE.SHELLCODE, cur_action, TAG_WEIGHT.MED)
 
                 # Entry point actions have an empty description field, re-organize result section for this case
                 if cur_action == 'Found Entry Point':
@@ -99,7 +99,7 @@ class ViperMonkey(ServiceBase):
                 else:
                     # Action's description will be the sub-section name
                     sub_action_section = ResultSection(SCORE.LOW, cur_description, parent=action_section)
-                    
+
                     # Parameters are sometimes stored as a list, account for this
                     if isinstance(action[1], list):
                         for item in action[1]:
@@ -124,18 +124,35 @@ class ViperMonkey(ServiceBase):
 
                     # Add urls/ips found in parameter to respective lists
                     self.find_ip(param)
-                    
-        # Add PowerShell score if found
+
+        # Add PowerShell score/tag if found
         if self.found_powershell:
             powershell_section = ResultSection(300, 'Discovered PowerShell code in file.', parent=self.result)
-                    
+
         # Add url/ip tags
         self.add_ip_tags()
 
         # Create section for built-in VBA functions called
         if len(external_functions) > 0:
+            vba_builtin_dict = {}
+            dict_path = os.path.join(os.path.dirname(__file__), 'VBA_built_ins.txt')
+            with open(dict_path, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if re.search(r'^#', line):
+                        continue
+                    if line:
+                        line = line.split(';')
+                        #if not line[1].strip:
+                        #    line[1] = ''
+                        vba_builtin_dict[line[0].strip()] = line[1].strip()
+
             external_func_section = ResultSection(SCORE.NULL, 'VBA functions called', body_format=TEXT_FORMAT.MEMORY_DUMP, parent=self.result)
-            external_func_section.add_line('\n'.join(external_functions))
+            for func in external_functions:
+                if func in vba_builtin_dict:
+                    external_func_section.add_line(func + ': ' + vba_builtin_dict[func])
+                else:
+                    external_func_section.add_line(func)
 
     def extract_powershell(self, parameter, section):
         """Searches parameter for PowerShell, adds as extracted if found
@@ -148,9 +165,9 @@ class ViperMonkey(ServiceBase):
         if re.findall(r'(?:powershell)|(?:pwsh)', parameter):
             self.found_powershell = True
             sha256hash = hashlib.sha256(parameter).hexdigest()
-            ResultSection(SCORE.NULL, 'Discovered PowerShell code in parameter.', parent = section)
+            ResultSection(SCORE.NULL, 'Discovered PowerShell code in parameter.', parent=section)
 
-            # Account for duplicates
+            # Add PowerShell code as extracted, account for duplicates
             if sha256hash not in self.file_hashes:
                 self.file_hashes.append(sha256hash)
                 powershell_dir = os.path.join(self.working_directory, '%s_extracted_powershell' % sha256hash[0:25])
@@ -205,7 +222,7 @@ class ViperMonkey(ServiceBase):
                     self.result.add_tag(TAG_TYPE.NET_PORT, net_port, TAG_WEIGHT.MED)
                 else:
                     self.result.add_tag(TAG_TYPE.NET_IP, ip_str, TAG_WEIGHT.MED)
-        
+
     def check_for_b64(self, data, section):
         """Search and decode base64 strings in sample data.
 
@@ -246,6 +263,7 @@ class ViperMonkey(ServiceBase):
                 base64data_decoded = ' ' + base64data.decode('utf-16').encode('ascii', 'ignore')
                 # Replace base64 from param with decoded string
                 decoded_param = re.sub(b64_string_raw, base64data_decoded, decoded_param)
+                self.decoded = True
                 decoded = True
             except:
                 pass
