@@ -2,7 +2,6 @@ from assemblyline.al.service.base import ServiceBase
 from assemblyline.al.common.result import Result, ResultSection, SCORE, TAG_TYPE, TAG_WEIGHT, TEXT_FORMAT, TAG_USAGE, \
     TAG_SCORE, Tag
 
-import ViperMonkey.vipermonkey.vmonkey as vmonkey
 import os
 import re
 import sys
@@ -22,6 +21,10 @@ class ViperMonkey(ServiceBase):
     SERVICE_CPU_CORES = 1
     SERVICE_RAM_MB = 512
 
+    def import_service_deps(self):
+        global process_file
+        from ViperMonkey.vipermonkey.vmonkey import process_file
+
     def __init__(self, cfg=None):
         super(ViperMonkey, self).__init__(cfg)
 
@@ -38,12 +41,14 @@ class ViperMonkey(ServiceBase):
         self.url_list = []
         self.found_powershell = False
         self.file_hashes = []
-        self.decoded = False
+        self.decoded = False 
+        vmonkey_err = False
+        actions = []
+        external_functions = []
 
         # Will store vipermonkey log/output
         log_path = os.path.join(self.working_directory, 'vipermonkey_output.log')
         logging.basicConfig(filename=log_path, level=logging.DEBUG, format='%(levelname)-8s %(message)s')
-        vmonkey_empty = False
 
         al_file = request.download()
         with open(al_file, 'r') as f:
@@ -55,7 +60,7 @@ class ViperMonkey(ServiceBase):
             stdout_saved = sys.stdout
             sys.stdout = log_file
             try:
-                vmonkey_values = vmonkey.process_file(None, al_file, data)
+                vmonkey_values = process_file(None, al_file, data)
                 # Checking for tuple in case vmonkey return is only None
                 if type(vmonkey_values) == tuple:
                     '''
@@ -74,15 +79,16 @@ class ViperMonkey(ServiceBase):
                     vmonkey_err = True
 
             except:
-                pass
+                self.log.error('vmonkey.py has encountered an error.')
+
             sys.stdout = stdout_saved
 
         # Add vmonkey log as a supplemental file
-        self.request.add_supplementary(log_path, 'vmonkey log')
-        if vmonkey_err is True:
-            ResultSection(SCORE.NULL, 'ViperMonkey has encountered an error, please check "vipermonkey_output.log"', parent=self.result)
-            return
-
+        if os.path.isfile(log_path):
+            if os.stat(log_path).st_size > 0:
+                self.request.add_supplementary(log_path, 'vmonkey log')
+                if vmonkey_err is True:
+                    ResultSection(SCORE.NULL, 'ViperMonkey has encountered an error, please check "vipermonkey_output.log"', parent=self.result)
 
         if len(actions) > 0:
             self.result.add_tag(TAG_TYPE.TECHNIQUE_MACROS, 'VBA macro(s) found', TAG_WEIGHT.MED)
@@ -162,7 +168,7 @@ class ViperMonkey(ServiceBase):
             section: Section to be modified if PowerShell found
         """
 
-        if re.findall(r'(?:powershell)|(?:pwsh)', parameter):
+        if re.findall(r'(?:powershell)|(?:pwsh)', parameter, re.IGNORECASE):
             self.found_powershell = True
             sha256hash = hashlib.sha256(parameter).hexdigest()
             ResultSection(SCORE.NULL, 'Discovered PowerShell code in parameter.', parent=section)
