@@ -61,10 +61,11 @@ class ViperMonkey(ServiceBase):
             sys.stdout = log_file
             try:
                 vmonkey_values = process_file(None, al_file, data)
-                # Checking for tuple in case vmonkey return is only None
+                # Checking for tuple in case vmonkey return is None
+                # If no macros found, return is [][], if error, return is None
                 if type(vmonkey_values) == tuple:
                     '''
-                    Structure of variable actions is as follows:
+                    Structure of variable "actions" is as follows:
                     [action, description, parameter]
                     action: 'Found Entry Point', 'Execute Command', etc...
                     parameter: Parameters for function
@@ -79,7 +80,7 @@ class ViperMonkey(ServiceBase):
                     vmonkey_err = True
 
             except:
-                self.log.error('vmonkey.py has encountered an error.')
+                raise
 
             sys.stdout = stdout_saved
 
@@ -100,11 +101,11 @@ class ViperMonkey(ServiceBase):
 
                 # Entry point actions have an empty description field, re-organize result section for this case
                 if cur_action == 'Found Entry Point':
-                    sub_action_section = ResultSection(SCORE.LOW, 'Found Entry Point', parent=action_section)
+                    sub_action_section = ResultSection(SCORE.NULL, 'Found Entry Point', parent=action_section)
                     sub_action_section.add_line(action[1])
                 else:
                     # Action's description will be the sub-section name
-                    sub_action_section = ResultSection(SCORE.LOW, cur_description, parent=action_section)
+                    sub_action_section = ResultSection(SCORE.NULL, cur_description, parent=action_section)
 
                     # Parameters are sometimes stored as a list, account for this
                     if isinstance(action[1], list):
@@ -149,8 +150,6 @@ class ViperMonkey(ServiceBase):
                         continue
                     if line:
                         line = line.split(';')
-                        #if not line[1].strip:
-                        #    line[1] = ''
                         vba_builtin_dict[line[0].strip()] = line[1].strip()
 
             external_func_section = ResultSection(SCORE.NULL, 'VBA functions called', body_format=TEXT_FORMAT.MEMORY_DUMP, parent=self.result)
@@ -184,6 +183,9 @@ class ViperMonkey(ServiceBase):
     def find_ip(self, parameter):
         """
         Parses parameter for urls/ip addresses, adds them to their respective lists
+
+        Args:
+            parameter: String to be searched
         """
 
         url_list = re.findall(r'https?://(?:[-\w.]|(?:[\da-zA-Z/?=%&]))+', parameter)
@@ -220,7 +222,7 @@ class ViperMonkey(ServiceBase):
             for ip in self.ip_list:
                 ip_str = str(ip)
                 ip_section.add_line(ip_str)
-                # checking if IP ports also found and adding the corresponding tags
+                # Checking if IP ports also found and adding the corresponding tags
                 if re.findall(":", ip_str):
                     net_ip, net_port = ip_str.split(':')
                     self.result.add_tag(TAG_TYPE.NET_FULL_URI, net_ip+':'+net_port)
