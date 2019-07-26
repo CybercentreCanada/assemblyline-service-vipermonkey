@@ -1,7 +1,5 @@
 from assemblyline.al.service.base import ServiceBase
-from assemblyline.al.common.result import Result, ResultSection, SCORE, TAG_TYPE, TAG_WEIGHT, TEXT_FORMAT, TAG_USAGE, \
-    TAG_SCORE, Tag
-
+from assemblyline.al.common.result import Result, ResultSection, SCORE, TAG_TYPE, TAG_WEIGHT, TEXT_FORMAT
 import os
 import re
 import sys
@@ -41,7 +39,7 @@ class ViperMonkey(ServiceBase):
         self.url_list = []
         self.found_powershell = False
         self.file_hashes = []
-        self.decoded = False 
+        self.decoded = False
         vmonkey_err = False
         actions = []
         external_functions = []
@@ -79,7 +77,7 @@ class ViperMonkey(ServiceBase):
                 else:
                     vmonkey_err = True
 
-            except:
+            except Exception:
                 raise
 
             sys.stdout = stdout_saved
@@ -89,7 +87,9 @@ class ViperMonkey(ServiceBase):
             if os.stat(log_path).st_size > 0:
                 self.request.add_supplementary(log_path, 'vmonkey log')
                 if vmonkey_err is True:
-                    ResultSection(SCORE.NULL, 'ViperMonkey has encountered an error, please check "vipermonkey_output.log"', parent=self.result)
+                    ResultSection(SCORE.INFO,
+                                  'ViperMonkey has encountered an error, please check "vipermonkey_output.log"',
+                                  parent=self.result)
 
         if len(actions) > 0:
             self.result.add_tag(TAG_TYPE.TECHNIQUE_MACROS, 'VBA macro(s) found', TAG_WEIGHT.MED)
@@ -127,14 +127,14 @@ class ViperMonkey(ServiceBase):
                     sub_action_section.add_line('Parameters: %s' % param)
 
                     # If decoded is true, possible base64 string has been found
-                    decoded = self.check_for_b64(param, sub_action_section)
+                    self.check_for_b64(param, sub_action_section)
 
                     # Add urls/ips found in parameter to respective lists
                     self.find_ip(param)
 
         # Add PowerShell score/tag if found
         if self.found_powershell:
-            powershell_section = ResultSection(300, 'Discovered PowerShell code in file.', parent=self.result)
+            ResultSection(300, 'Discovered PowerShell code in file.', parent=self.result)
 
         # Add url/ip tags
         self.add_ip_tags()
@@ -152,7 +152,8 @@ class ViperMonkey(ServiceBase):
                         line = line.split(';')
                         vba_builtin_dict[line[0].strip()] = line[1].strip()
 
-            external_func_section = ResultSection(SCORE.NULL, 'VBA functions called', body_format=TEXT_FORMAT.MEMORY_DUMP, parent=self.result)
+            external_func_section = ResultSection(SCORE.NULL, 'VBA functions called',
+                                                  body_format=TEXT_FORMAT.MEMORY_DUMP, parent=self.result)
             for func in external_functions:
                 if func in vba_builtin_dict:
                     external_func_section.add_line(func + ': ' + vba_builtin_dict[func])
@@ -209,7 +210,8 @@ class ViperMonkey(ServiceBase):
         if self.url_list:
             # Remove duplicates
             self.url_list = list(dict.fromkeys(self.url_list))
-            domain_section = ResultSection(SCORE['LOW'], "ViperMonkey has found these domain names:", parent=self.result)
+            domain_section = ResultSection(SCORE.LOW, "ViperMonkey has found these domain names:",
+                                           parent=self.result)
             for url in self.url_list:
                 domain_section.add_line(url)
                 self.result.add_tag(TAG_TYPE.NET_FULL_URI, url, TAG_WEIGHT.MED)
@@ -218,7 +220,7 @@ class ViperMonkey(ServiceBase):
         if self.ip_list:
             # Remove duplicates
             self.ip_list = list(dict.fromkeys(self.ip_list))
-            ip_section = ResultSection(SCORE['LOW'], "ViperMonkey has found these IP addresses:", parent=self.result)
+            ip_section = ResultSection(SCORE.LOW, "ViperMonkey has found these IP addresses:", parent=self.result)
             for ip in self.ip_list:
                 ip_str = str(ip)
                 ip_section.add_line(ip_str)
@@ -273,7 +275,7 @@ class ViperMonkey(ServiceBase):
                 decoded_param = re.sub(b64_string_raw, base64data_decoded, decoded_param)
                 self.decoded = True
                 decoded = True
-            except:
+            except Exception:
                 pass
 
         if decoded:
