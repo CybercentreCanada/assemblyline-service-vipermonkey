@@ -106,6 +106,8 @@ class ViperMonkey(ServiceBase):
                 else:
                     # Action's description will be the sub-section name
                     sub_action_section = ResultSection(SCORE.NULL, cur_description, parent=action_section)
+                    if cur_description == 'Shell function':
+                        sub_action_section.change_score(SCORE.HIGH)
 
                     # Parameters are sometimes stored as a list, account for this
                     if isinstance(action[1], list):

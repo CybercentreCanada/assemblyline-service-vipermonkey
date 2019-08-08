@@ -18,4 +18,4 @@ This service uses Decalage's ViperMonkey (https://github.com/decalage2/ViperMonk
         NET_FULL_URI
         NET_PORT
         BASE64_ALPHABET
-        SHELLCODE
+        TECHNIQUE_MACROS
