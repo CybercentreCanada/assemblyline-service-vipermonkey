@@ -1,11 +1,12 @@
-from assemblyline.al.service.base import ServiceBase
-from assemblyline.al.common.result import Result, ResultSection, SCORE, TAG_TYPE, TAG_WEIGHT, TEXT_FORMAT
+import binascii
+import hashlib
+import logging
 import os
 import re
 import sys
-import logging
-import binascii
-import hashlib
+
+from assemblyline.al.common.result import Result, ResultSection, SCORE, TAG_TYPE, TAG_WEIGHT, TEXT_FORMAT
+from assemblyline.al.service.base import ServiceBase
 
 
 class ViperMonkey(ServiceBase):
@@ -18,10 +19,10 @@ class ViperMonkey(ServiceBase):
     SERVICE_STAGE = 'CORE'
     SERVICE_CPU_CORES = 1
     SERVICE_RAM_MB = 512
+    SERVICE_TIMEOUT = 300
 
     def import_service_deps(self):
         global process_file
-        from ViperMonkey.vipermonkey.vmonkey import process_file
 
     def __init__(self, cfg=None):
         super(ViperMonkey, self).__init__(cfg)
@@ -85,7 +86,7 @@ class ViperMonkey(ServiceBase):
         # Add vmonkey log as a supplemental file
         if os.path.isfile(log_path):
             if os.stat(log_path).st_size > 0:
-                self.request.add_supplementary(log_path, 'vmonkey log')
+                # self.request.add_supplementary(log_path, 'vmonkey log')
                 if vmonkey_err is True:
                     ResultSection(SCORE.INFO,
                                   'ViperMonkey has encountered an error, please check "vipermonkey_output.log"',
