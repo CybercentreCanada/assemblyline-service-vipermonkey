@@ -1,0 +1,59 @@
+name: ViperMonkey
+version: 1
+description: Office File VBA Macro Magnet.
+
+accepts: (document/.*|code/xml)
+rejects: empty|metadata/.*
+
+stage: CORE
+category: Static Analysis
+
+file_required: true
+timeout: 300
+disable_cache: false
+
+enabled: true
+is_external: false
+licence_count: 0
+
+heuristics:
+  - heur_id: 1
+    name: ViperMonkey Error
+    score: 1
+    filetype: (document/.*|code/xml)
+    description: ViperMonkey encountered an error
+
+  - heur_id: 2
+    name: Shell Function Found
+    score: 100
+    filetype: (document/.*|code/xml)
+    description: Shell function found by ViperMonkey
+
+  - heur_id: 3
+    name: PowerShell Code Found
+    score: 300
+    filetype: (document/.*|code/xml)
+    description: Discovered PowerShell code in file
+
+  - heur_id: 4
+    name: Domain Name Found
+    score: 10
+    filetype: (document/.*|code/xml)
+    description: Domain name found by ViperMonkey
+
+  - heur_id: 5
+    name: IP Address Found
+    score: 10
+    filetype: (document/.*|code/xml)
+    description: IP address found by ViperMonkey
+
+  - heur_id: 6
+    name: Possible Base64 Found
+    score: 100
+    filetype: (document/.*|code/xml)
+    description: Found possible Base64 parameter
+
+docker_config:
+  image: cccs/assemblyline-service-suricata:latest
+  cpu_cores: 1
+  ram_mb: 512

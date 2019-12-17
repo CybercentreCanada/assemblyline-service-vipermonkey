@@ -1,1 +1,0 @@
-antlr4 -Dlanguage=Python2 -encoding utf8 vba.g4
