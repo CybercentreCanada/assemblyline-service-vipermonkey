@@ -5,7 +5,8 @@ ENV SERVICE_PATH vipermonkey_.ViperMonkey
 RUN apt-get update && apt-get install -y \
   python2.7 \
   python2.7-dev \
-  python-pip
+  python-pip \
+  python-dev
 
 RUN pip2 install -U https://github.com/decalage2/ViperMonkey/archive/master.zip
 
