@@ -1,0 +1,69 @@
+import json
+import logging
+import os
+import sys
+
+from cStringIO import StringIO
+
+from assemblyline_v4_p2compat.common import log as al_log
+from vipermonkey.vmonkey import process_file
+
+if __name__ == "__main__":
+    al_log.init_logging('vipermonkey', log_level=logging.INFO)
+    log = logging.getLogger("assemblyline.service.vipermonkey")
+    log.debug("ViperMonkey Python2 compat module loaded and ready!")
+    # noinspection PyBroadException
+    try:
+        if len(sys.argv) != 3:
+            log.error("No enough arguments to execute")
+            exit(1)
+
+        file_to_scan = sys.argv[1]
+        output_file = sys.argv[2]
+
+        if os.path.exists(file_to_scan):
+            log.debug('Parsing file {file_to_scan} with ViperMonkey'.format(file_to_scan=file_to_scan))
+            with open(output_file, 'w') as file:
+                # hijack stdout and stderr
+                old_stdout = sys.stdout
+                old_stderr = sys.stderr
+                sys.stdout = my_stdout = StringIO()
+                sys.stderr = my_stderr = StringIO()
+
+                vmonkey_values = process_file(None, file_to_scan, None)
+
+                # Release stdout and stderr
+                sys.stdout = old_stdout
+                sys.stderr = old_stderr
+
+                # Get stdout and stderr values
+                my_stdout.flush()
+                my_stdout.seek(0)
+                stdout = my_stdout.read()
+                my_stderr.flush()
+                my_stderr.seek(0)
+                stderr = my_stderr.read()
+
+                vmonkey_error = None
+                if vmonkey_values is None:
+                    last_3_lines = list(stdout.splitlines())[-3:]
+                    if last_3_lines[1].strip() == "^":
+                        vmonkey_error = "\n".join(last_3_lines)
+                        log.error(vmonkey_error)
+
+                output = dict(
+                    vmonkey_values=vmonkey_values,
+                    vmonkey_err=vmonkey_error,
+                    stdout=stdout,
+                    stderr=stderr
+                )
+
+                log.debug('Scan completed. Writing results to {output_file}'.format(output_file=output_file))
+                json.dump(output, file)
+
+        else:
+            log.error("File to scan not found.")
+            exit(1)
+    except Exception as e:
+        log.exception("Unknown error caught while executing vipermonkey: {e}".format(e=str(e)))
+        exit(1)

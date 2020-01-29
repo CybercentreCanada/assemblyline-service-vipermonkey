@@ -1,18 +1,19 @@
 import binascii
 import hashlib
 import json
-import logging
 import os
 import re
-import shutil
 import subprocess
-import sys
 import tempfile
 
 from assemblyline_v4_service.common.base import ServiceBase
 from assemblyline_v4_service.common.result import Result, ResultSection, BODY_FORMAT, Heuristic
 
 
+PYTHON2_INTERPRETER = os.environ.get("PYTHON2_INTERPRETER", "python2")
+
+
+# noinspection PyBroadException
 class ViperMonkey(ServiceBase):
     def __init__(self, config=None):
         super(ViperMonkey, self).__init__(config)
@@ -36,71 +37,62 @@ class ViperMonkey(ServiceBase):
         vmonkey_err = False
         actions = []
         external_functions = []
-
-        # Will store vipermonkey log/output
-        log_path = os.path.join(self.working_directory, 'vipermonkey_output.log')
-        logging.basicConfig(filename=log_path, level=logging.DEBUG, format='%(levelname)-8s %(message)s')
+        output_results = {}
 
         al_file = request.file_path
-        # with open(al_file, 'rb') as f:
-        #     data = f.read()
 
-        # Running vmonkey
-        with open(log_path, 'a') as log_file:
-            # Temporary output json file to save output after processing file
-            output_path = os.path.join(tempfile.gettempdir(), 'output.json')
+        # Temporary output json file to save output after processing file
+        output_path = os.path.join(tempfile.gettempdir(), f'{request.sid}_output.json')
+        if os.path.exists(output_path):
+            os.unlink(output_path)
 
-            # Saving stdout as we want stdout going to a vipermonkey log for the vmonkey call
-            stdout_saved = sys.stdout
-            sys.stdout = log_file
-            try:
-                cmd = "python2 -c " \
-                      "\"from vipermonkey.vmonkey import process_file\n" \
-                      "import json\n" \
-                      "with open('%s', 'rb') as f:" \
-                      "\tdata = f.read()\n" \
-                      "output = dict(vmonkey_values=process_file(None, '%s', data))\n" \
-                      "with open('%s', 'w') as file:\n" \
-                      "\tjson.dump(output, file)\""
-                p = subprocess.Popen(cmd % (al_file, al_file, output_path), stdout=subprocess.PIPE,
-                                     stderr=subprocess.PIPE, shell=True, cwd="/tmp")
-                p.wait()
+        # Running ViperMonkey
+        try:
+            cmd = " ".join([PYTHON2_INTERPRETER,
+                            os.path.join(os.path.dirname(__file__), 'vipermonkey_compat.py2'),
+                            al_file,
+                            output_path])
+            p = subprocess.Popen(cmd, shell=True)
+            p.wait()
+
+            # Read output
+            if os.path.exists(output_path):
                 with open(output_path, 'r') as f:
-                    vmonkey_values = json.load(f)['vmonkey_values']
+                    output_results = json.load(f)
 
-                # vmonkey_values = process_file(None, al_file, data)
                 # Checking for tuple in case vmonkey return is None
                 # If no macros found, return is [][], if error, return is None
-                if type(vmonkey_values) == list:
+                if type(output_results['vmonkey_values']) == list:
                     '''
                     Structure of variable "actions" is as follows:
                     [action, description, parameter]
                     action: 'Found Entry Point', 'Execute Command', etc...
                     parameter: Parameters for function
                     description: 'Shell Function', etc...
-
+    
                     external_functions is a list of built-in VBA functions
                     that were called
                     '''
-                    actions = vmonkey_values[0]
-                    external_functions = vmonkey_values[1]
+                    actions = output_results['vmonkey_values'][0]
+                    external_functions = output_results['vmonkey_values'][1]
                 else:
                     vmonkey_err = True
+            else:
+                vmonkey_err = True
 
-            except Exception:
-                raise
-
-            sys.stdout = stdout_saved
+        except Exception:
+            raise
 
         # Add vmonkey log as a supplemental file
-        if os.path.isfile(log_path):
-            if os.stat(log_path).st_size > 0:
-                temp_log_copy = os.path.join(tempfile.gettempdir(), 'vipermonkey_output.log')
-                shutil.copy(log_path, temp_log_copy)
-                self.request.add_supplementary(temp_log_copy, 'vipermonkey_output.log', 'ViperMonkey log output')
-                if vmonkey_err is True:
-                    ResultSection('ViperMonkey has encountered an error, please check "vipermonkey_output.log"',
-                                  parent=self.result, heuristic=Heuristic(1))
+        if 'stdout' in output_results:
+            temp_log_copy = os.path.join(tempfile.gettempdir(), f'{request.sid}_vipermonkey_output.log')
+            with open(temp_log_copy, "w") as temp_log_file:
+                temp_log_file.write(output_results['stdout'])
+
+            self.request.add_supplementary(temp_log_copy, 'vipermonkey_output.log', 'ViperMonkey log output')
+            if vmonkey_err is True:
+                ResultSection('ViperMonkey has encountered an error, please check "vipermonkey_output.log"',
+                              parent=self.result, heuristic=Heuristic(1))
 
         if len(actions) > 0:
             # Creating action section
@@ -205,7 +197,7 @@ class ViperMonkey(ServiceBase):
         """
 
         url_list = re.findall(r'https?://(?:[-\w.]|(?:[\da-zA-Z/?=%&]))+', parameter)
-        ip_list = re.findall(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?:\:\d{1,4})?', parameter)
+        ip_list = re.findall(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?::\d{1,4})?', parameter)
 
         for url in url_list:
             url_strip = url.strip()
@@ -267,7 +259,7 @@ class ViperMonkey(ServiceBase):
         decoded = False
 
         for b64_match in re.findall('([\x20]{0,2}(?:[A-Za-z0-9+/]{10,}={0,2}[\r]?[\n]?){2,})',
-                                    re.sub('\x3C\x00\x20\x20\x00', '', data)):
+                                    re.sub('\x3C\x00\x20{2}\x00', '', data)):
             b64 = b64_match.replace('\n', '').replace('\r', '').replace(' ', '').replace('<', '')
             uniq_char = ''.join(set(b64))
             if len(uniq_char) > 6:
