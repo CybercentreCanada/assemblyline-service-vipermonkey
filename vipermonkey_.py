@@ -39,26 +39,20 @@ class ViperMonkey(ServiceBase):
         external_functions = []
         output_results = {}
 
-        al_file = request.file_path
-
-        # Temporary output json file to save output after processing file
-        output_path = os.path.join(tempfile.gettempdir(), f'{request.sid}_output.json')
-        if os.path.exists(output_path):
-            os.unlink(output_path)
-
         # Running ViperMonkey
         try:
             cmd = " ".join([PYTHON2_INTERPRETER,
                             os.path.join(os.path.dirname(__file__), 'vipermonkey_compat.py2'),
-                            al_file,
-                            output_path])
-            p = subprocess.Popen(cmd, shell=True)
-            p.wait()
+                            request.file_path])
+            p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+            stdout, _ = p.communicate()
 
             # Read output
-            if os.path.exists(output_path):
-                with open(output_path, 'r') as f:
-                    output_results = json.load(f)
+            if stdout:
+                for l in stdout.splitlines():
+                    if l.startswith(b"{") and l.endswith(b"}"):
+                        output_results = json.loads(l)
+                        break
 
                 # Checking for tuple in case vmonkey return is None
                 # If no macros found, return is [][], if error, return is None
