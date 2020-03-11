@@ -48,6 +48,6 @@ heuristics:
     description: Found possible Base64 parameter
 
 docker_config:
-  image: cccs/assemblyline-service-vipermonkey:latest
+  image: ${REGISTRY}cccs/assemblyline-service-vipermonkey:latest
   cpu_cores: 1
   ram_mb: 512
