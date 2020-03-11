@@ -36,18 +36,12 @@ heuristics:
     description: Discovered PowerShell code in file
 
   - heur_id: 4
-    name: Domain Name Found
+    name: IOC Found
     score: 10
     filetype: (document/.*|code/xml)
-    description: Domain name found by ViperMonkey
+    description: IOC found by ViperMonkey
 
   - heur_id: 5
-    name: IP Address Found
-    score: 10
-    filetype: (document/.*|code/xml)
-    description: IP address found by ViperMonkey
-
-  - heur_id: 6
     name: Possible Base64 Found
     score: 100
     filetype: (document/.*|code/xml)

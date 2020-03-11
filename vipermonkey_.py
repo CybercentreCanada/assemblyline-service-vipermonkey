@@ -6,11 +6,16 @@ import re
 import subprocess
 import tempfile
 
+from urllib.parse import urlparse
+
+from assemblyline.odm import IP_REGEX, DOMAIN_REGEX, IP_ONLY_REGEX, URI_PATH
 from assemblyline_v4_service.common.base import ServiceBase
 from assemblyline_v4_service.common.result import Result, ResultSection, BODY_FORMAT, Heuristic
 
 
-PYTHON2_INTERPRETER = os.environ.get("PYTHON2_INTERPRETER", "python2")
+PYTHON2_INTERPRETER = os.environ.get("PYTHON2_INTERPRETER", "pypy")
+R_URI = f"(?:(?:(?:https?|ftp):)?//)(?:\\S+(?::\\S*)?@)?(?:{IP_REGEX}|{DOMAIN_REGEX})(?::\\d{{2,5}})?{URI_PATH}?"
+R_IP = f'{IP_REGEX}(?::\d{{1,4}})?'
 
 
 # noinspection PyBroadException
@@ -37,6 +42,7 @@ class ViperMonkey(ServiceBase):
         vmonkey_err = False
         actions = []
         external_functions = []
+        tmp_iocs = []
         output_results = {}
 
         # Running ViperMonkey
@@ -56,7 +62,7 @@ class ViperMonkey(ServiceBase):
 
                 # Checking for tuple in case vmonkey return is None
                 # If no macros found, return is [][], if error, return is None
-                if type(output_results['vmonkey_values']) == list:
+                if type(output_results['vmonkey_values']) == dict:
                     '''
                     Structure of variable "actions" is as follows:
                     [action, description, parameter]
@@ -67,8 +73,9 @@ class ViperMonkey(ServiceBase):
                     external_functions is a list of built-in VBA functions
                     that were called
                     '''
-                    actions = output_results['vmonkey_values'][0]
-                    external_functions = output_results['vmonkey_values'][1]
+                    actions = output_results['vmonkey_values']['actions']
+                    external_functions = output_results['vmonkey_values']['external_funcs']
+                    tmp_iocs = output_results['vmonkey_values']['tmp_iocs']
                 else:
                     vmonkey_err = True
             else:
@@ -131,6 +138,16 @@ class ViperMonkey(ServiceBase):
                     # Add urls/ips found in parameter to respective lists
                     self.find_ip(param)
 
+        # Check tmp_iocs
+        res_temp_iocs = ResultSection('Runtime temporary IOCs')
+        for ioc in tmp_iocs:
+            self.extract_powershell(ioc, res_temp_iocs)
+            self.check_for_b64(ioc, res_temp_iocs)
+            self.find_ip(ioc)
+
+        if len(res_temp_iocs.subsections) != 0 or res_temp_iocs.body:
+            self.result.add_section(res_temp_iocs)
+
         # Add PowerShell score/tag if found
         if self.found_powershell:
             ResultSection('Discovered PowerShell code in file', parent=self.result, heuristic=Heuristic(3))
@@ -191,7 +208,7 @@ class ViperMonkey(ServiceBase):
         """
 
         url_list = re.findall(r'https?://(?:[-\w.]|(?:[\da-zA-Z/?=%&]))+', parameter)
-        ip_list = re.findall(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?::\d{1,4})?', parameter)
+        ip_list = re.findall(R_IP, parameter)
 
         for url in url_list:
             url_strip = url.strip()
@@ -208,32 +225,36 @@ class ViperMonkey(ServiceBase):
         """
 
         # If URL's have been found, add them to the service results
+        sec_iocs = ResultSection("ViperMonkey has found the following IOCs:",
+                                 parent=self.result, heuristic=Heuristic(4))
         if self.url_list:
             # Remove duplicates
             self.url_list = list(dict.fromkeys(self.url_list))
-            domain_section = ResultSection("ViperMonkey has found these domain names:", parent=self.result,
-                                           heuristic=Heuristic(4))
             for url in self.url_list:
-                domain_section.add_line(url)
-                domain_section.add_tag('network.static.uri', url)
+                sec_iocs.add_line(url)
+                sec_iocs.add_tag('network.static.uri', url)
+                try:
+                    parsed = urlparse(url)
+                    if not re.match(IP_ONLY_REGEX, parsed.hostname):
+                        sec_iocs.add_tag('network.static.domain', parsed.hostname)
+
+                except Exception:
+                    pass
 
         # If IP addresses have been found, add them to the service results
         if self.ip_list:
             # Remove duplicates
             self.ip_list = list(dict.fromkeys(self.ip_list))
-            ip_section = ResultSection("ViperMonkey has found these IP addresses:", parent=self.result,
-                                       heuristic=Heuristic(5))
             for ip in self.ip_list:
                 ip_str = str(ip)
-                ip_section.add_line(ip_str)
+                sec_iocs.add_line(ip_str)
                 # Checking if IP ports also found and adding the corresponding tags
                 if re.findall(":", ip_str):
                     net_ip, net_port = ip_str.split(':')
-                    ip_section.add_tag('network.static.uri', f"{net_ip}:{net_port}")
-                    ip_section.add_tag('network.static.ip', net_ip)
-                    ip_section.add_tag('network.port', net_port)
+                    sec_iocs.add_tag('network.static.ip', net_ip)
+                    sec_iocs.add_tag('network.port', net_port)
                 else:
-                    ip_section.add_tag('network.static.ip', ip_str)
+                    sec_iocs.add_tag('network.static.ip', ip_str)
 
     def check_for_b64(self, data, section):
         """Search and decode base64 strings in sample data.
@@ -278,7 +299,7 @@ class ViperMonkey(ServiceBase):
                 pass
 
         if decoded:
-            decoded_section = ResultSection('Possible Base64 found', parent=section, heuristic=Heuristic(6))
+            decoded_section = ResultSection('Possible Base64 found', parent=section, heuristic=Heuristic(5))
             decoded_section.add_line(f'Possible Base64 Decoded Parameters: {decoded_param}')
             self.find_ip(decoded_param)
 

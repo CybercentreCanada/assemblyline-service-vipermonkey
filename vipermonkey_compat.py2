@@ -1,12 +1,33 @@
 import json
 import logging
 import os
+import subprocess
 import sys
 
 from cStringIO import StringIO
 
 from assemblyline_v4_p2compat.common import log as al_log
+
 from vipermonkey.vmonkey import process_file
+
+
+def check_output(*popenargs, **kwargs):
+
+    if 'stdout' in kwargs:
+        raise ValueError('stdout argument not allowed, it will be overridden.')
+    process = subprocess.Popen(stdout=subprocess.PIPE, stderr=subprocess.PIPE, *popenargs, **kwargs)
+    output, unused_err = process.communicate()
+    retcode = process.poll()
+    if retcode:
+        cmd = kwargs.get("args")
+        if cmd is None:
+            cmd = popenargs[0]
+        raise subprocess.CalledProcessError(retcode, cmd, output=output)
+    return output
+
+
+subprocess.check_output = check_output
+
 
 if __name__ == "__main__":
     al_log.init_logging('vipermonkey', log_level=logging.INFO)
@@ -45,13 +66,18 @@ if __name__ == "__main__":
 
             vmonkey_error = None
             if vmonkey_values is None:
+                vmonkey_values = ([], [], [])
                 last_3_lines = list(stdout.splitlines())[-3:]
                 if last_3_lines[1].strip() == "^":
                     vmonkey_error = "\n".join(last_3_lines)
                     log.error(vmonkey_error)
 
             output = dict(
-                vmonkey_values=vmonkey_values,
+                vmonkey_values=dict(
+                    actions=list(vmonkey_values[0]),
+                    external_funcs=list(vmonkey_values[1]),
+                    tmp_iocs=list(vmonkey_values[2])
+                ),
                 vmonkey_err=vmonkey_error,
                 stdout=stdout,
                 stderr=stderr
