@@ -15,7 +15,7 @@ from assemblyline_v4_service.common.result import Result, ResultSection, BODY_FO
 
 PYTHON2_INTERPRETER = os.environ.get("PYTHON2_INTERPRETER", "pypy")
 R_URI = f"(?:(?:(?:https?|ftp):)?//)(?:\\S+(?::\\S*)?@)?(?:{IP_REGEX}|{DOMAIN_REGEX})(?::\\d{{2,5}})?{URI_PATH}?"
-R_IP = f'{IP_REGEX}(?::\d{{1,4}})?'
+R_IP = f'{IP_REGEX}(?::\\d{{1,4}})?'
 
 
 # noinspection PyBroadException
@@ -224,13 +224,12 @@ class ViperMonkey(ServiceBase):
         Adds tags for urls and ip addresses from given lists
         """
 
-        # If URL's have been found, add them to the service results
-        sec_iocs = ResultSection("ViperMonkey has found the following IOCs:",
-                                 parent=self.result, heuristic=Heuristic(4))
-        if self.url_list:
-            # Remove duplicates
-            self.url_list = list(dict.fromkeys(self.url_list))
-            for url in self.url_list:
+        if self.url_list or self.ip_list:
+            sec_iocs = ResultSection("ViperMonkey has found the following IOCs:",
+                                     parent=self.result, heuristic=Heuristic(4))
+
+            # Add Urls
+            for url in set(self.url_list):
                 sec_iocs.add_line(url)
                 sec_iocs.add_tag('network.static.uri', url)
                 try:
@@ -241,20 +240,16 @@ class ViperMonkey(ServiceBase):
                 except Exception:
                     pass
 
-        # If IP addresses have been found, add them to the service results
-        if self.ip_list:
-            # Remove duplicates
-            self.ip_list = list(dict.fromkeys(self.ip_list))
-            for ip in self.ip_list:
-                ip_str = str(ip)
-                sec_iocs.add_line(ip_str)
+            # Add IPs
+            for ip in set(self.ip_list):
+                sec_iocs.add_line(ip)
                 # Checking if IP ports also found and adding the corresponding tags
-                if re.findall(":", ip_str):
-                    net_ip, net_port = ip_str.split(':')
+                if re.findall(":", ip):
+                    net_ip, net_port = ip.split(':')
                     sec_iocs.add_tag('network.static.ip', net_ip)
                     sec_iocs.add_tag('network.port', net_port)
                 else:
-                    sec_iocs.add_tag('network.static.ip', ip_str)
+                    sec_iocs.add_tag('network.static.ip', ip)
 
     def check_for_b64(self, data, section):
         """Search and decode base64 strings in sample data.
