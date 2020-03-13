@@ -50,4 +50,4 @@ heuristics:
 docker_config:
   image: ${REGISTRY}cccs/assemblyline-service-vipermonkey:latest
   cpu_cores: 1
-  ram_mb: 512
+  ram_mb: 768
