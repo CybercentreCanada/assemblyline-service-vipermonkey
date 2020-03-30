@@ -16,10 +16,10 @@ RUN ln -s /opt/pypy2.7-v7.3.0-linux64/bin/pypy /usr/local/bin/pypy
 
 # Install packages
 RUN pypy -m ensurepip
-RUN pypy -m pip install -U pip
+RUN pypy -m pip install --no-cache-dir -U pip
 
-RUN pypy -m pip install -U https://github.com/decalage2/ViperMonkey/archive/master.zip
-RUN pypy -m pip install assemblyline_v4_p2compat pyparsing==2.2.0
+RUN pypy -m pip install --no-cache-dir -U https://github.com/decalage2/ViperMonkey/archive/master.zip
+RUN pypy -m pip install --no-cache-dir assemblyline_v4_p2compat pyparsing==2.2.0
 
 ###############################
 # Setup final service container
