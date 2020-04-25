@@ -14,8 +14,8 @@ This service uses Decalage's ViperMonkey (https://github.com/decalage2/ViperMonk
 
 3. Tags:
 
-        NET_IP
-        NET_FULL_URI
-        NET_PORT
-        BASE64_ALPHABET
-        TECHNIQUE_MACROS
+        network.static.domain
+        network.static.ip
+        network.static.uri
+        network.port
+        technique.macro

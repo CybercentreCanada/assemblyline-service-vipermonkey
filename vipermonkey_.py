@@ -279,12 +279,6 @@ class ViperMonkey(ServiceBase):
         for b64_string, b64_string_raw in zip(b64_matches, b64_matches_raw):
             try:
                 base64data = binascii.a2b_base64(b64_string)
-                # Tagging base64, some strings are very long, account for this
-                # if len(b64_string) > 50:
-                #     b64_tag = b64_string[:50]
-                # else:
-                #     b64_tag = b64_string
-                # self.result.add_tag(TAG_TYPE.BASE64_ALPHABET, b64_tag)  # unused tag in v4
                 # Decode base64 bytes, add a space to beginning as it may be stripped off while using regex
                 base64data_decoded = ' ' + base64data.decode('utf-16').encode('ascii', 'ignore')
                 # Replace base64 from param with decoded string
