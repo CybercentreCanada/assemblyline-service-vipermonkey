@@ -2,7 +2,7 @@ name: ViperMonkey
 version: 1
 description: Office File VBA Macro Magnet.
 
-accepts: (document/.*|code/xml)
+accepts: (document/.*|code/xml|code/vbs)
 rejects: empty|metadata/.*
 
 stage: CORE
