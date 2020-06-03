@@ -1,5 +1,5 @@
 name: ViperMonkey
-version: 1
+version: $SERVICE_TAG
 description: Office File VBA Macro Magnet.
 
 accepts: (document/.*|code/xml|code/vbs)
@@ -48,6 +48,6 @@ heuristics:
     description: Found possible Base64 parameter
 
 docker_config:
-  image: ${REGISTRY}cccs/assemblyline-service-vipermonkey:latest
+  image: ${REGISTRY}cccs/assemblyline-service-vipermonkey:$SERVICE_TAG
   cpu_cores: 1
   ram_mb: 768
