@@ -186,7 +186,11 @@ class ViperMonkey(ServiceBase):
 
         if re.findall(r'(?:powershell)|(?:pwsh)', parameter, re.IGNORECASE):
             self.found_powershell = True
-            sha256hash = hashlib.sha256(parameter).hexdigest()
+            if type(parameter) == str:
+                # Unicode-objects must be encoded before hashing
+                sha256hash = hashlib.sha256(parameter.encode()).hexdigest()
+            else:
+                sha256hash = hashlib.sha256(parameter).hexdigest()
             ResultSection('Discovered PowerShell code in parameter.', parent=section)
 
             # Add PowerShell code as extracted, account for duplicates
