@@ -57,7 +57,10 @@ class ViperMonkey(ServiceBase):
             if stdout:
                 for l in stdout.splitlines():
                     if l.startswith(b"{") and l.endswith(b"}"):
-                        output_results = json.loads(l)
+                        try:
+                            output_results = json.loads(l)
+                        except UnicodeDecodeError:
+                            output_results = json.loads(l.decode("utf-8", "replace"))
                         break
 
                 # Checking for tuple in case vmonkey return is None

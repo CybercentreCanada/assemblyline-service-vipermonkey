@@ -91,7 +91,10 @@ if __name__ == "__main__":
                 )
 
             log.debug('Scan completed. Writing results to stdout')
-            print(json.dumps(output))
+            try:
+                print(json.dumps(output))
+            except ValueError:
+                print(json.dumps(output, ensure_ascii=False))
 
         else:
             log.error("File to scan not found.")
