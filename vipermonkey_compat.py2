@@ -72,23 +72,16 @@ if __name__ == "__main__":
                     vmonkey_error = "\n".join(last_3_lines)
                     log.error(vmonkey_error)
 
-            error_in_stdout = False
-
-            try:
-                json.dumps(stdout)
-            except:
-                error_in_stdout = True
-
             output = dict(
-                    vmonkey_values=dict(
-                        actions=list(vmonkey_values[0]),
-                        external_funcs=list(vmonkey_values[1]),
-                        tmp_iocs=list(vmonkey_values[2])
-                    ),
-                    vmonkey_err=vmonkey_error,
-                    stdout= stdout if not error_in_stdout else "error in stdout encoding",
-                    stderr=stderr
-                )
+                vmonkey_values=dict(
+                    actions=list(vmonkey_values[0]),
+                    external_funcs=list(vmonkey_values[1]),
+                    tmp_iocs=list(vmonkey_values[2])
+                ),
+                vmonkey_err=vmonkey_error,
+                stdout=stdout,
+                stderr=stderr
+            )
 
             log.debug('Scan completed. Writing results to stdout')
             try:
