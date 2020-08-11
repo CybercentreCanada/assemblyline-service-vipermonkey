@@ -104,7 +104,7 @@ class ViperMonkey(ServiceBase):
             action_section.add_tag('technique.macro', 'Contains VBA Macro(s)')
             for action in actions:    # Creating action sub-sections for each action
                 cur_action = action[0]
-                cur_description = action[2]
+                cur_description = action[2] if action[2] else cur_action
 
                 # Entry point actions have an empty description field, re-organize result section for this case
                 if cur_action == 'Found Entry Point':
