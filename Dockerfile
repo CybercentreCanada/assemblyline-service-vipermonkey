@@ -10,7 +10,7 @@ FROM base AS builder
 
 # Install pypy
 RUN apt-get update && apt-get install -y wget bzip2 build-essential && rm -rf /var/lib/apt/lists/*
-RUN wget -O /tmp/pypy2.7-v7.3.0-linux64.tar.bz2 https://bitbucket.org/pypy/pypy/downloads/pypy2.7-v7.3.0-linux64.tar.bz2
+RUN wget -O /tmp/pypy2.7-v7.3.0-linux64.tar.bz2 https://downloads.python.org/pypy/pypy2.7-v7.3.0-linux64.tar.bz2
 RUN tar -xvf /tmp/pypy2.7-v7.3.0-linux64.tar.bz2 -C /opt
 RUN ln -s /opt/pypy2.7-v7.3.0-linux64/bin/pypy /usr/local/bin/pypy
 
