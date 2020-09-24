@@ -65,7 +65,7 @@ class ViperMonkey(ServiceBase):
 
                 # Checking for tuple in case vmonkey return is None
                 # If no macros found, return is [][], if error, return is None
-                if type(output_results['vmonkey_values']) == dict:
+                if type(output_results.get('vmonkey_values')) == dict:
                     '''
                     Structure of variable "actions" is as follows:
                     [action, description, parameter]
