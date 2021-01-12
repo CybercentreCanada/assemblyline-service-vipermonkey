@@ -23,11 +23,6 @@ class ViperMonkey(ServiceBase):
     def __init__(self, config=None):
         super(ViperMonkey, self).__init__(config)
 
-        self.ip_list = []
-        self.url_list = []
-        self.found_powershell = False
-        self.file_hashes = []
-
         self.request = None
         self.result = None
 
@@ -38,6 +33,11 @@ class ViperMonkey(ServiceBase):
         self.result = Result()
         request.result = self.result
         self.request = request
+
+        self.ip_list = []
+        self.url_list = []
+        self.found_powershell = False
+        self.file_hashes = []
 
         vmonkey_err = False
         actions = []
