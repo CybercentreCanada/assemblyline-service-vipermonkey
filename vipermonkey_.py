@@ -23,6 +23,11 @@ class ViperMonkey(ServiceBase):
     def __init__(self, config=None):
         super(ViperMonkey, self).__init__(config)
 
+        self.ip_list = []
+        self.url_list = []
+        self.found_powershell = False
+        self.file_hashes = []
+
         self.request = None
         self.result = None
 
@@ -72,7 +77,7 @@ class ViperMonkey(ServiceBase):
                     action: 'Found Entry Point', 'Execute Command', etc...
                     parameter: Parameters for function
                     description: 'Shell Function', etc...
-    
+
                     external_functions is a list of built-in VBA functions
                     that were called
                     '''
