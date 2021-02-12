@@ -1,6 +1,7 @@
 FROM cccs/assemblyline-v4-service-base:latest as base
 
 ENV SERVICE_PATH vipermonkey_.ViperMonkey
+ENV pypy pypy2.7-v7.3.3
 
 USER root
 
@@ -10,9 +11,9 @@ FROM base AS builder
 
 # Install pypy
 RUN apt-get update && apt-get install -y wget bzip2 build-essential && rm -rf /var/lib/apt/lists/*
-RUN wget -O /tmp/pypy2.7-v7.3.0-linux64.tar.bz2 https://downloads.python.org/pypy/pypy2.7-v7.3.0-linux64.tar.bz2
-RUN tar -xvf /tmp/pypy2.7-v7.3.0-linux64.tar.bz2 -C /opt
-RUN ln -s /opt/pypy2.7-v7.3.0-linux64/bin/pypy /usr/local/bin/pypy
+RUN wget -O /tmp/${pypy}-linux64.tar.bz2 https://downloads.python.org/pypy/${pypy}-linux64.tar.bz2
+RUN tar -xvf /tmp/${pypy}-linux64.tar.bz2 -C /opt
+RUN ln -s /opt/${pypy}-linux64/bin/pypy /usr/local/bin/pypy
 
 # Install packages
 RUN pypy -m ensurepip
@@ -26,8 +27,8 @@ RUN pypy -m pip install --no-cache-dir assemblyline_v4_p2compat pyparsing==2.2.0
 FROM base
 
 # Copy pypy from builder and set it up
-COPY --from=builder /opt/pypy2.7-v7.3.0-linux64 /opt/pypy2.7-v7.3.0-linux64
-RUN ln -s /opt/pypy2.7-v7.3.0-linux64/bin/pypy /usr/local/bin/pypy
+COPY --from=builder /opt/${pypy}-linux64 /opt/${pypy}-linux64
+RUN ln -s /opt/${pypy}-linux64/bin/pypy /usr/local/bin/pypy
 
 # Switch to assemblyline user
 USER assemblyline
