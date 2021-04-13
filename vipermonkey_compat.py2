@@ -10,6 +10,7 @@ from assemblyline_v4_p2compat.common import log as al_log
 
 from vipermonkey.vmonkey import process_file
 
+LOG_LEVEL = logging.getLevelName(os.environ.get("LOG_LEVEL", "INFO"))
 
 def check_output(*popenargs, **kwargs):
 
@@ -30,8 +31,8 @@ subprocess.check_output = check_output
 
 
 if __name__ == "__main__":
-    al_log.init_logging('vipermonkey', log_level=logging.INFO)
-    log = logging.getLogger("assemblyline.service.vipermonkey")
+    al_log.init_logging('vipermonkey', log_level=LOG_LEVEL)
+    log = logging.getLogger("assemblyline.service.vipermonkey.py2")
     log.debug("ViperMonkey Python2 compat module loaded and ready!")
     # noinspection PyBroadException
     try:
@@ -69,8 +70,8 @@ if __name__ == "__main__":
                 vmonkey_values = ([], [], [])
                 last_3_lines = list(stdout.splitlines())[-3:]
                 if last_3_lines[1].strip() == "^":
-                    vmonkey_error = "\n".join(last_3_lines)
-                    log.error(vmonkey_error)
+                    vmonkey_error = "\\n".join(last_3_lines)
+                    log.error(stdout.splitlines())
 
             output = dict(
                 vmonkey_values=dict(
