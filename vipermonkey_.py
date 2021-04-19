@@ -6,6 +6,7 @@ import re
 import subprocess
 import tempfile
 
+from codecs import BOM_UTF8
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
@@ -54,11 +55,22 @@ class ViperMonkey(ServiceBase):
 
         # Running ViperMonkey
         try:
+            input_file: str = request.file_path
+            input_file_obj: IO = None
+            # Remove potential BOMs from contents
+            if request.file_contents.startswith(BOM_UTF8):
+                input_file_obj = tempfile.NamedTemporaryFile('w+', encoding='utf-8')
+                input_file_obj.write(request.file_contents.decode('utf-8-sig'))
+                input_file = input_file_obj.name
+
             cmd = " ".join([PYTHON2_INTERPRETER,
                             os.path.join(os.path.dirname(__file__), 'vipermonkey_compat.py2'),
-                            request.file_path])
+                            input_file])
             p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
             stdout, _ = p.communicate()
+
+            if input_file_obj:
+                input_file_obj.close()
 
             # Read output
             if stdout:
@@ -185,7 +197,6 @@ class ViperMonkey(ServiceBase):
             if vmonkey_err is True:
                 ResultSection('ViperMonkey has encountered an error, please check "vipermonkey_output.log"',
                               parent=self.result, heuristic=Heuristic(1))
-
 
     def extract_powershell(self, parameter: str, section: ResultSection) -> None:
         """Searches parameter for PowerShell, adds as extracted if found
