@@ -19,6 +19,7 @@ RUN ln -s /opt/${pypy}-linux64/bin/pypy /usr/local/bin/pypy
 RUN pypy -m ensurepip
 RUN pypy -m pip install --no-cache-dir -U pip
 
+RUN pypy -m pip install colorlog==5.0.0
 RUN pypy -m pip install --no-cache-dir -U https://github.com/decalage2/ViperMonkey/archive/master.zip
 RUN pypy -m pip install --no-cache-dir assemblyline_v4_p2compat pyparsing==2.2.0
 
