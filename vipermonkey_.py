@@ -9,7 +9,6 @@ from codecs import BOM_UTF8, BOM_UTF16
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
-from assemblyline.common.identify import STRONG_INDICATORS
 from assemblyline.odm import DOMAIN_REGEX, IP_ONLY_REGEX, IP_REGEX, URI_PATH
 from assemblyline_v4_service.common.base import ServiceBase
 from assemblyline_v4_service.common.request import ServiceRequest
