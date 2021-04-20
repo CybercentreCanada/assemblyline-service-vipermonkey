@@ -71,7 +71,7 @@ if __name__ == "__main__":
                 last_3_lines = list(stdout.splitlines())[-3:]
                 if last_3_lines[1].strip() == "^":
                     vmonkey_error = "\\n".join(last_3_lines)
-                    log.error(last_3_lines)
+                    log.error("{file_to_scan}: {msg}".format(file_to_scan=file_to_scan, msg=last_3_lines))
 
             output = dict(
                 vmonkey_values=dict(

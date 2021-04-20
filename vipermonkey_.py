@@ -5,15 +5,14 @@ import os
 import re
 import subprocess
 import tempfile
-
+from codecs import BOM_UTF8, BOM_UTF16
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
-from assemblyline.odm import IP_REGEX, DOMAIN_REGEX, IP_ONLY_REGEX, URI_PATH
+from assemblyline.odm import DOMAIN_REGEX, IP_ONLY_REGEX, IP_REGEX, URI_PATH
 from assemblyline_v4_service.common.base import ServiceBase
 from assemblyline_v4_service.common.request import ServiceRequest
-from assemblyline_v4_service.common.result import Result, ResultSection, BODY_FORMAT, Heuristic
-
+from assemblyline_v4_service.common.result import BODY_FORMAT, Heuristic, Result, ResultSection
 
 PYTHON2_INTERPRETER = os.environ.get("PYTHON2_INTERPRETER", "pypy")
 R_URI = f"(?:(?:(?:https?|ftp):)?//)(?:\\S+(?::\\S*)?@)?(?:{IP_REGEX}|{DOMAIN_REGEX})(?::\\d{{2,5}})?{URI_PATH}?"
@@ -54,11 +53,37 @@ class ViperMonkey(ServiceBase):
 
         # Running ViperMonkey
         try:
+            input_file: str = request.file_path
+            input_file_obj: IO = None
+            # Typical start to XML files
+            if not request.file_contents.startswith(b'<?') and request.file_type == 'code/xml':
+                # Default encoding/decoding if BOM not found
+                encoding: str = None
+                decoding: str = None
+                # Remove potential BOMs from contents
+                if request.file_contents.startswith(BOM_UTF8):
+                    encoding = 'utf-8'
+                    decoding = 'utf-8-sig'
+                elif request.file_contents.startswith(BOM_UTF16):
+                    encoding = 'utf-16'
+                    decoding = 'utf-16le'
+                if encoding and decoding:
+                    input_file_obj = tempfile.NamedTemporaryFile('w+', encoding=encoding)
+                    input_file_obj.write(request.file_contents.decode(decoding))
+                    input_file = input_file_obj.name
+                else:
+                    # If the file_type was detected as XML, it's probably buried within but not actually an XML file
+                    # Give no response as ViperMonkey can't process this kind of file
+                    return
+
             cmd = " ".join([PYTHON2_INTERPRETER,
                             os.path.join(os.path.dirname(__file__), 'vipermonkey_compat.py2'),
-                            request.file_path])
+                            input_file])
             p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
             stdout, _ = p.communicate()
+
+            if input_file_obj:
+                input_file_obj.close()
 
             # Read output
             if stdout:
@@ -185,7 +210,6 @@ class ViperMonkey(ServiceBase):
             if vmonkey_err is True:
                 ResultSection('ViperMonkey has encountered an error, please check "vipermonkey_output.log"',
                               parent=self.result, heuristic=Heuristic(1))
-
 
     def extract_powershell(self, parameter: str, section: ResultSection) -> None:
         """Searches parameter for PowerShell, adds as extracted if found
