@@ -31,8 +31,8 @@ subprocess.check_output = check_output
 
 
 if __name__ == "__main__":
-    al_log.init_logging('vipermonkey', log_level=LOG_LEVEL)
     log = logging.getLogger("assemblyline.service.vipermonkey.py2")
+    log.setLevel(LOG_LEVEL)
     log.debug("ViperMonkey Python2 compat module loaded and ready!")
     # noinspection PyBroadException
     try:

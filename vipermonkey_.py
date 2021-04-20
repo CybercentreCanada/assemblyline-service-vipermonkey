@@ -79,8 +79,8 @@ class ViperMonkey(ServiceBase):
             cmd = " ".join([PYTHON2_INTERPRETER,
                             os.path.join(os.path.dirname(__file__), 'vipermonkey_compat.py2'),
                             input_file])
-            p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
-            stdout, _ = p.communicate()
+            p = subprocess.run(cmd, capture_output=True, shell=True)
+            stdout = p.stdout
 
             if input_file_obj:
                 input_file_obj.close()
@@ -96,7 +96,8 @@ class ViperMonkey(ServiceBase):
                         break
 
                 # Checking for tuple in case vmonkey return is None
-                # If no macros found, return is [][], if error, return is None
+                # If no macros found, return is [][][], if error, return is None
+                # vmonkey_err can still happen if return is [][][], log as warning instead of error
                 if isinstance(output_results.get('vmonkey_values'), dict):
                     '''
                     Structure of variable "actions" is as follows:
@@ -111,6 +112,9 @@ class ViperMonkey(ServiceBase):
                     actions = output_results['vmonkey_values']['actions']
                     external_functions = output_results['vmonkey_values']['external_funcs']
                     tmp_iocs = output_results['vmonkey_values']['tmp_iocs']
+                    if output_results['vmonkey_err']:
+                        vmonkey_err = True
+                        self.log.warning(output_results['vmonkey_err'])
                 else:
                     vmonkey_err = True
             else:
