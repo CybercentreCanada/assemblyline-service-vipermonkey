@@ -121,7 +121,7 @@ class ViperMonkey(ServiceBase):
                 vmonkey_err = True
 
         except Exception:
-            self.log.exception("Vipermonkey failed to analyze file {request.sha256}")
+            self.log.exception(f"Vipermonkey failed to analyze file {request.sha256}")
 
         if len(actions) > 0:
             # Creating action section
