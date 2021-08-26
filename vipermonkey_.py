@@ -6,7 +6,7 @@ import re
 import subprocess
 import tempfile
 from codecs import BOM_UTF8, BOM_UTF16
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, IO, List, Optional
 from urllib.parse import urlparse
 
 from assemblyline.odm import DOMAIN_REGEX, IP_ONLY_REGEX, IP_REGEX, URI_PATH
@@ -55,12 +55,12 @@ class ViperMonkey(ServiceBase):
         try:
             file_contents = request.file_contents
             input_file: str = request.file_path
-            input_file_obj: IO = None
+            input_file_obj: Optional[IO] = None
             # Typical start to XML files
             if not file_contents.startswith(b'<?') and request.file_type == 'code/xml':
                 # Default encoding/decoding if BOM not found
-                encoding: str = None
-                decoding: str = None
+                encoding: Optional[str] = None
+                decoding: Optional[str] = None
                 # Remove potential BOMs from contents
                 if file_contents.startswith(BOM_UTF8):
                     encoding = 'utf-8'
