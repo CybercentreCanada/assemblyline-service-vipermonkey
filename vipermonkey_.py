@@ -6,7 +6,7 @@ import re
 import subprocess
 import tempfile
 from codecs import BOM_UTF8, BOM_UTF16
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, IO, List, Optional
 from urllib.parse import urlparse
 
 from assemblyline.odm import DOMAIN_REGEX, IP_ONLY_REGEX, IP_REGEX, URI_PATH
@@ -55,12 +55,12 @@ class ViperMonkey(ServiceBase):
         try:
             file_contents = request.file_contents
             input_file: str = request.file_path
-            input_file_obj: IO = None
+            input_file_obj: Optional[IO] = None
             # Typical start to XML files
             if not file_contents.startswith(b'<?') and request.file_type == 'code/xml':
                 # Default encoding/decoding if BOM not found
-                encoding: str = None
-                decoding: str = None
+                encoding: Optional[str] = None
+                decoding: Optional[str] = None
                 # Remove potential BOMs from contents
                 if file_contents.startswith(BOM_UTF8):
                     encoding = 'utf-8'
@@ -102,9 +102,9 @@ class ViperMonkey(ServiceBase):
                 if isinstance(output_results.get('vmonkey_values'), dict):
                     '''
                     Structure of variable "actions" is as follows:
-                    [action, description, parameter]
+                    [action, parameters, description]
                     action: 'Found Entry Point', 'Execute Command', etc...
-                    parameter: Parameters for function
+                    parameters: Parameters for function
                     description: 'Shell Function', etc...
 
                     external_functions is a list of built-in VBA functions
@@ -124,48 +124,54 @@ class ViperMonkey(ServiceBase):
         except Exception:
             self.log.exception(f"Vipermonkey failed to analyze file {request.sha256}")
 
-        if len(actions) > 0:
+        if actions:
             # Creating action section
             action_section = ResultSection('Recorded Actions:', parent=self.result)
             action_section.add_tag('technique.macro', 'Contains VBA Macro(s)')
-            for action in actions:    # Creating action sub-sections for each action
-                cur_action = action[0]
-                cur_description = action[2] if action[2] else cur_action
+            sub_action_sections: Dict[str, ResultSection] = {}
+            for action, parameters, description in actions:    # Creating action sub-sections for each action
+                if not description: # For actions with no description, just use the type of action
+                    description = action
 
-                # Entry point actions have an empty description field, re-organize result section for this case
-                if cur_action == 'Found Entry Point':
-                    sub_action_section = ResultSection('Found Entry Point', parent=action_section)
-                    sub_action_section.add_line(action[1])
-                else:
+                if description not in sub_action_sections:
                     # Action's description will be the sub-section name
-                    sub_action_section = ResultSection(cur_description, parent=action_section)
-                    if cur_description == 'Shell function':
+                    sub_action_section = ResultSection(description, parent=action_section)
+                    sub_action_sections[description] = sub_action_section
+                    if description == 'Shell function':
                         sub_action_section.set_heuristic(2)
+                else:
+                    # Reuse existing section
+                    sub_action_section = sub_action_sections[description]
+                    if sub_action_section.heuristic:
+                        sub_action_section.heuristic.increment_frequency()
 
-                    # Parameters are sometimes stored as a list, account for this
-                    if isinstance(action[1], list):
-                        for item in action[1]:
-                            # Parameters includes more than strings (booleans for example)
-                            if isinstance(item, str):
-                                # Check for PowerShell
-                                self.extract_powershell(item, sub_action_section)
-                        # Join list items into single string
-                        param = ', '.join(str(a) for a in action[1])
-
-                    else:
-                        param = action[1]
+                # Parameters are sometimes stored as a list, account for this
+                if isinstance(parameters, list):
+                    for item in parameters:
                         # Parameters includes more than strings (booleans for example)
-                        if isinstance(param, str):
-                            self.extract_powershell(param, sub_action_section)
+                        if isinstance(item, str):
+                            # Check for PowerShell
+                            self.extract_powershell(item, sub_action_section)
+                    # Join list items into single string
+                    param = ', '.join(str(p) for p in parameters)
 
-                    sub_action_section.add_line(f'Action: {cur_action}')
-                    sub_action_section.add_line(f'Parameters: {param}')
+                else:
+                    param = parameters
+                    # Parameters includes more than strings (booleans for example)
+                    if isinstance(param, str):
+                        self.extract_powershell(param, sub_action_section)
 
-                    # If decoded is true, possible base64 string has been found
-                    self.check_for_b64(param, sub_action_section)
+                # If the description field was empty, re-organize result section for this case
+                if description == action:
+                    sub_action_section.add_line(param)
+                else:
+                    sub_action_section.add_line(f'Action: {action}, Parameters: {param}')
 
-                    # Add urls/ips found in parameter to respective lists
-                    self.find_ip(param)
+                # If decoded is true, possible base64 string has been found
+                self.check_for_b64(param, sub_action_section)
+
+                # Add urls/ips found in parameter to respective lists
+                self.find_ip(param)
 
         # Check tmp_iocs
         res_temp_iocs = ResultSection('Runtime temporary IOCs')
@@ -315,6 +321,8 @@ class ViperMonkey(ServiceBase):
         for b64_match in re.findall('([\x20]{0,2}(?:[A-Za-z0-9+/]{10,}={0,2}[\r]?[\n]?){2,})',
                                     re.sub('\x3C\x00\x20{2}\x00', '', data)):
             b64 = b64_match.replace('\n', '').replace('\r', '').replace(' ', '').replace('<', '')
+            if re.match('(?:[A-Z][a-z]{3,})+', b64):
+                continue # Parameter is more likely camel case english than base64
             uniq_char = ''.join(set(b64))
             if len(uniq_char) > 6:
                 if len(b64) >= 16 and len(b64) % 4 == 0:
