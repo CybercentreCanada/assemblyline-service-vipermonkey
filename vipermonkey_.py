@@ -1,4 +1,3 @@
-import binascii
 import hashlib
 import json
 import os
@@ -9,8 +8,11 @@ from codecs import BOM_UTF8, BOM_UTF16
 from typing import Any, Dict, IO, List, Optional
 from urllib.parse import urlparse
 
+from assemblyline.common.str_utils import safe_str
 from assemblyline.odm import DOMAIN_REGEX, IP_ONLY_REGEX, IP_REGEX, URI_PATH
 from assemblyline_v4_service.common.base import ServiceBase
+from assemblyline_v4_service.common.extractor.base64 import base64_search
+from assemblyline_v4_service.common.extractor.pe_file import find_pe_files
 from assemblyline_v4_service.common.request import ServiceRequest
 from assemblyline_v4_service.common.result import BODY_FORMAT, Heuristic, Result, ResultSection
 
@@ -18,6 +20,7 @@ PYTHON2_INTERPRETER = os.environ.get("PYTHON2_INTERPRETER", "pypy")
 R_URI = f"(?:(?:(?:https?|ftp):)?//)(?:\\S+(?::\\S*)?@)?(?:{IP_REGEX}|{DOMAIN_REGEX})(?::\\d{{2,5}})?{URI_PATH}?"
 R_IP = f'{IP_REGEX}(?::\\d{{1,4}})?'
 
+FILE_PARAMETER_SIZE = 500
 
 # noinspection PyBroadException
 class ViperMonkey(ServiceBase):
@@ -128,6 +131,7 @@ class ViperMonkey(ServiceBase):
             # Creating action section
             action_section = ResultSection('Recorded Actions:', parent=self.result)
             action_section.add_tag('technique.macro', 'Contains VBA Macro(s)')
+            base64_section = ResultSection('Possible Base64 found', heuristic=Heuristic(5, frequency=0))
             sub_action_sections: Dict[str, ResultSection] = {}
             for action, parameters, description in actions:    # Creating action sub-sections for each action
                 if not description: # For actions with no description, just use the type of action
@@ -168,17 +172,21 @@ class ViperMonkey(ServiceBase):
                     sub_action_section.add_line(f'Action: {action}, Parameters: {param}')
 
                 # If decoded is true, possible base64 string has been found
-                self.check_for_b64(param, sub_action_section)
+                self.check_for_b64(param, base64_section)
 
                 # Add urls/ips found in parameter to respective lists
                 self.find_ip(param)
-
+            if base64_section.heuristic.frequency:
+                action_section.add_subsection(base64_section)
         # Check tmp_iocs
         res_temp_iocs = ResultSection('Runtime temporary IOCs')
+        ioc_b64_section = ResultSection('Possible Base64 found', heuristic=Heuristic(5, frequency=0))
         for ioc in tmp_iocs:
             self.extract_powershell(ioc, res_temp_iocs)
-            self.check_for_b64(ioc, res_temp_iocs)
+            self.check_for_b64(ioc, ioc_b64_section)
             self.find_ip(ioc)
+        if ioc_b64_section.heuristic.frequency:
+            res_temp_iocs.add_subsection(ioc_b64_section)
 
         if len(res_temp_iocs.subsections) != 0 or res_temp_iocs.body:
             self.result.add_section(res_temp_iocs)
@@ -301,7 +309,7 @@ class ViperMonkey(ServiceBase):
                 else:
                     sec_iocs.add_tag('network.static.ip', ip)
 
-    def check_for_b64(self, data: str, section: ResultSection) -> bool:
+    def check_for_b64(self, data: str, section: ResultSection, request: ServiceRequest) -> bool:
         """Search and decode base64 strings in sample data.
 
         Args:
@@ -311,37 +319,37 @@ class ViperMonkey(ServiceBase):
         Returns:
             decoded: Boolean which is true if base64 found
         """
-
-        b64_matches: List[str] = []
-        # b64_matches_raw will be used for replacing in case b64_matches are modified
-        b64_matches_raw: List[str] = []
         decoded_param = data
         decoded = False
 
-        for b64_match in re.findall('([\x20]{0,2}(?:[A-Za-z0-9+/]{10,}={0,2}[\r]?[\n]?){2,})',
-                                    re.sub('\x3C\x00\x20{2}\x00', '', data)):
-            b64 = b64_match.replace('\n', '').replace('\r', '').replace(' ', '').replace('<', '')
-            if re.match('(?:[A-Z][a-z]{3,})+', b64):
-                continue # Parameter is more likely camel case english than base64
-            uniq_char = ''.join(set(b64))
-            if len(uniq_char) > 6:
-                if len(b64) >= 16 and len(b64) % 4 == 0:
-                    b64_matches.append(b64)
-                    b64_matches_raw.append(b64_match)
-        for b64_string, b64_string_raw in zip(b64_matches, b64_matches_raw):
+        for match, content in base64_search(data.encode()).items():
             try:
-                base64data = binascii.a2b_base64(b64_string)
-                # Decode base64 bytes, add a space to beginning as it may be stripped off while using regex
-                base64data_decoded = ' ' + base64data.decode('utf-16', errors='ignore')
-                # Replace base64 from param with decoded string
-                decoded_param = re.sub(b64_string_raw, base64data_decoded, decoded_param)
+                decoded_param = re.sub(match.decode(),
+                                       ' ' + content.decode('utf-16', errors='ignore'),
+                                       decoded_param)
                 decoded = True
+
+                pe_files = find_pe_files(content)
+                for pe_file in pe_files:
+                    pe_hash = hashlib.sha256(pe_file).hexdigest()
+                    pe_path = os.path.join(self.working_directory, pe_hash)
+                    with open(pe_path, 'wb') as f:
+                        f.write(pe_file)
+                    request.add_extracted(pe_path, pe_hash, 'PE file found in base64 encoded parameter')
+                    section.heuristic.add_signature_id('pe_file')
+                if len(content) > FILE_PARAMETER_SIZE and not pe_files:
+                    content_hash = hashlib.sha256(content).hexdigest()
+                    content_path = os.path.join(self.working_directory, content_hash)
+                    with open(content_path, 'wb') as f:
+                        f.write(content)
+                    request.add_extracted(content_path, content_hash, 'Large base64 encoded parameter')
+                    section.heuristic.add_signature_id('possible_file')
             except Exception:
                 pass
 
         if decoded:
-            decoded_section = ResultSection('Possible Base64 found', parent=section, heuristic=Heuristic(5))
-            decoded_section.add_line(f'Possible Base64 Decoded Parameters: {decoded_param}')
+            section.heuristic.increment_frequency()
+            section.add_line(f'Possible Base64 {safe_str(match)} decoded: {decoded_param}')
             self.find_ip(decoded_param)
 
         return decoded
