@@ -5,11 +5,12 @@ import re
 import subprocess
 import tempfile
 from codecs import BOM_UTF8, BOM_UTF16
-from typing import Any, Dict, IO, List, Optional, Union
+from typing import Any, Dict, IO, List, Optional, Set, Union
 from urllib.parse import urlparse
 
 from assemblyline.common.str_utils import safe_str
 from assemblyline.odm import DOMAIN_REGEX, IP_ONLY_REGEX, IP_REGEX, URI_PATH
+from assemblyline_v4_service.common import result
 from assemblyline_v4_service.common.base import ServiceBase
 from assemblyline_v4_service.common.extractor.base64 import base64_search
 from assemblyline_v4_service.common.extractor.pe_file import find_pe_files
@@ -60,6 +61,7 @@ class ViperMonkey(ServiceBase):
         external_functions: List[str] = []
         tmp_iocs: List[str] = []
         output_results: Dict[str, Any] = {}
+        potential_base64: Set[str] = {}
 
         # Running ViperMonkey
         try:
@@ -138,7 +140,6 @@ class ViperMonkey(ServiceBase):
             # Creating action section
             action_section = ResultSection('Recorded Actions:', parent=self.result)
             action_section.add_tag('technique.macro', 'Contains VBA Macro(s)')
-            base64_section = ResultSection('Possible Base64 found', heuristic=Heuristic(5, frequency=0))
             sub_action_sections: Dict[str, ResultSection] = {}
             for action, parameters, description in actions:    # Creating action sub-sections for each action
                 if not description: # For actions with no description, just use the type of action
@@ -178,19 +179,17 @@ class ViperMonkey(ServiceBase):
                 else:
                     sub_action_section.add_line(f'Action: {action}, Parameters: {param}')
 
-                # If decoded is true, possible base64 string has been found
-                self.check_for_b64(param, base64_section, request)
+                # Check later for base64
+                potential_base64.add(param)
 
                 # Add urls/ips found in parameter to respective lists
                 self.find_ip(param)
-            if base64_section.heuristic.frequency:
-                action_section.add_subsection(base64_section)
         # Check tmp_iocs
         res_temp_iocs = ResultSection('Runtime temporary IOCs')
         ioc_b64_section = ResultSection('Possible Base64 found', heuristic=Heuristic(5, frequency=0))
         for ioc in tmp_iocs:
             self.extract_powershell(ioc, res_temp_iocs)
-            self.check_for_b64(ioc, ioc_b64_section, request)
+            potential_base64.add(ioc)
             self.find_ip(ioc)
         if ioc_b64_section.heuristic.frequency:
             res_temp_iocs.add_subsection(ioc_b64_section)
@@ -201,6 +200,13 @@ class ViperMonkey(ServiceBase):
         # Add PowerShell score/tag if found
         if self.found_powershell:
             ResultSection('Discovered PowerShell code in file', parent=self.result, heuristic=Heuristic(3))
+
+        # Check parameters and temp_iocs for base64
+        base64_section = ResultSection('Possible Base64 found', heuristic=Heuristic(5, frequency=0))
+        for param in potential_base64:
+            self.check_for_b64(param, base64_section, request)
+        if base64_section.body:
+            self.result.add_section(base64_section)
 
         # Add url/ip tags
         self.add_ip_tags()
