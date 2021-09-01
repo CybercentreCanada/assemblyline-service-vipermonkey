@@ -5,7 +5,7 @@ import re
 import subprocess
 import tempfile
 from codecs import BOM_UTF8, BOM_UTF16
-from typing import Any, Dict, IO, List, Optional
+from typing import Any, Dict, IO, List, Optional, Union
 from urllib.parse import urlparse
 
 from assemblyline.common.str_utils import safe_str
@@ -21,6 +21,13 @@ R_URI = f"(?:(?:(?:https?|ftp):)?//)(?:\\S+(?::\\S*)?@)?(?:{IP_REGEX}|{DOMAIN_RE
 R_IP = f'{IP_REGEX}(?::\\d{{1,4}})?'
 
 FILE_PARAMETER_SIZE = 500
+
+def truncate(string: Union[bytes, str], length: int = 100) -> str:
+    """ Helper to avoid cluttering output """
+    string = safe_str(string)
+    if len(string) > length:
+        return string[:length] + '...'
+    return string
 
 # noinspection PyBroadException
 class ViperMonkey(ServiceBase):
@@ -172,7 +179,7 @@ class ViperMonkey(ServiceBase):
                     sub_action_section.add_line(f'Action: {action}, Parameters: {param}')
 
                 # If decoded is true, possible base64 string has been found
-                self.check_for_b64(param, base64_section)
+                self.check_for_b64(param, base64_section, request)
 
                 # Add urls/ips found in parameter to respective lists
                 self.find_ip(param)
@@ -183,7 +190,7 @@ class ViperMonkey(ServiceBase):
         ioc_b64_section = ResultSection('Possible Base64 found', heuristic=Heuristic(5, frequency=0))
         for ioc in tmp_iocs:
             self.extract_powershell(ioc, res_temp_iocs)
-            self.check_for_b64(ioc, ioc_b64_section)
+            self.check_for_b64(ioc, ioc_b64_section, request)
             self.find_ip(ioc)
         if ioc_b64_section.heuristic.frequency:
             res_temp_iocs.add_subsection(ioc_b64_section)
@@ -324,32 +331,33 @@ class ViperMonkey(ServiceBase):
 
         for match, content in base64_search(data.encode()).items():
             try:
-                decoded_param = re.sub(match.decode(),
-                                       ' ' + content.decode('utf-16', errors='ignore'),
-                                       decoded_param)
+                if len(content) < FILE_PARAMETER_SIZE:
+                    decoded_param = decoded_param.replace(match.decode(),
+                                           ' ' + content.decode('utf-16', errors='ignore'))
+                else:
+                    pe_files = find_pe_files(content)
+                    for pe_file in pe_files:
+                        b64hash = hashlib.sha256(pe_file).hexdigest()
+                        pe_path = os.path.join(self.working_directory, b64hash)
+                        with open(pe_path, 'wb') as f:
+                            f.write(pe_file)
+                        request.add_extracted(pe_path, b64hash, 'PE file found in base64 encoded parameter')
+                        section.heuristic.add_signature_id('pe_file')
+                    if not pe_files:
+                        b64hash = hashlib.sha256(content).hexdigest()
+                        content_path = os.path.join(self.working_directory, b64hash)
+                        with open(content_path, 'wb') as f:
+                            f.write(content)
+                        request.add_extracted(content_path, b64hash, 'Large base64 encoded parameter')
+                        section.heuristic.add_signature_id('possible_file')
+                    decoded_param = decoded_param.replace(match.decode(), f'[See extracted file {b64hash}]')
                 decoded = True
-
-                pe_files = find_pe_files(content)
-                for pe_file in pe_files:
-                    pe_hash = hashlib.sha256(pe_file).hexdigest()
-                    pe_path = os.path.join(self.working_directory, pe_hash)
-                    with open(pe_path, 'wb') as f:
-                        f.write(pe_file)
-                    request.add_extracted(pe_path, pe_hash, 'PE file found in base64 encoded parameter')
-                    section.heuristic.add_signature_id('pe_file')
-                if len(content) > FILE_PARAMETER_SIZE and not pe_files:
-                    content_hash = hashlib.sha256(content).hexdigest()
-                    content_path = os.path.join(self.working_directory, content_hash)
-                    with open(content_path, 'wb') as f:
-                        f.write(content)
-                    request.add_extracted(content_path, content_hash, 'Large base64 encoded parameter')
-                    section.heuristic.add_signature_id('possible_file')
             except Exception:
-                pass
+                raise
 
         if decoded:
             section.heuristic.increment_frequency()
-            section.add_line(f'Possible Base64 {safe_str(match)} decoded: {decoded_param}')
+            section.add_line(f'Possible Base64 {truncate(match)} decoded: {decoded_param}')
             self.find_ip(decoded_param)
 
         return decoded
