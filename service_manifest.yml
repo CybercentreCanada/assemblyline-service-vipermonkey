@@ -44,6 +44,9 @@ heuristics:
   - heur_id: 5
     name: Possible Base64 Found
     score: 100
+    signature_score_map:
+      possible_file: 500
+      pe_file: 1000
     filetype: (document/.*|code/xml)
     description: Found possible Base64 parameter
 
