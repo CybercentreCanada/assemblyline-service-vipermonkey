@@ -23,9 +23,9 @@ R_IP = f'{IP_REGEX}(?::\\d{{1,4}})?'
 
 FILE_PARAMETER_SIZE = 500
 
-def truncate(string: Union[bytes, str], length: int = 100) -> str:
+def truncate(data: Union[bytes, str], length: int = 100) -> str:
     """ Helper to avoid cluttering output """
-    string = safe_str(string)
+    string = safe_str(data)
     if len(string) > length:
         return string[:length] + '...'
     return string
@@ -61,7 +61,7 @@ class ViperMonkey(ServiceBase):
         external_functions: List[str] = []
         tmp_iocs: List[str] = []
         output_results: Dict[str, Any] = {}
-        potential_base64: Set[str] = {}
+        potential_base64: Set[str] = set()
 
         # Running ViperMonkey
         try:
@@ -186,13 +186,10 @@ class ViperMonkey(ServiceBase):
                 self.find_ip(param)
         # Check tmp_iocs
         res_temp_iocs = ResultSection('Runtime temporary IOCs')
-        ioc_b64_section = ResultSection('Possible Base64 found', heuristic=Heuristic(5, frequency=0))
         for ioc in tmp_iocs:
             self.extract_powershell(ioc, res_temp_iocs)
             potential_base64.add(ioc)
             self.find_ip(ioc)
-        if ioc_b64_section.heuristic.frequency:
-            res_temp_iocs.add_subsection(ioc_b64_section)
 
         if len(res_temp_iocs.subsections) != 0 or res_temp_iocs.body:
             self.result.add_section(res_temp_iocs)
@@ -327,11 +324,13 @@ class ViperMonkey(ServiceBase):
 
         Args:
             data: Data to be parsed
-            section: Sub-section to be modified if base64 found
+            section: base64 subsection, must have heuristic set
 
         Returns:
             decoded: Boolean which is true if base64 found
         """
+        assert section.heuristic
+
         decoded_param = data
         decoded = False
 
@@ -341,6 +340,7 @@ class ViperMonkey(ServiceBase):
                     decoded_param = decoded_param.replace(match.decode(),
                                            ' ' + content.decode('utf-16', errors='ignore'))
                 else:
+                    b64hash = ''
                     pe_files = find_pe_files(content)
                     for pe_file in pe_files:
                         b64hash = hashlib.sha256(pe_file).hexdigest()
@@ -363,7 +363,7 @@ class ViperMonkey(ServiceBase):
 
         if decoded:
             section.heuristic.increment_frequency()
-            section.add_line(f'Possible Base64 {truncate(match)} decoded: {decoded_param}')
+            section.add_line(f'Possible Base64 {truncate(data)} decoded: {decoded_param}')
             self.find_ip(decoded_param)
 
         return decoded
