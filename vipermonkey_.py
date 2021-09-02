@@ -359,7 +359,7 @@ class ViperMonkey(ServiceBase):
                     decoded_param = decoded_param.replace(match.decode(), f'[See extracted file {b64hash}]')
                 decoded = True
             except Exception:
-                raise
+                pass
 
         if decoded:
             section.heuristic.increment_frequency()
