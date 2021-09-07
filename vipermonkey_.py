@@ -4,13 +4,13 @@ import os
 import re
 import subprocess
 import tempfile
+from ast import literal_eval
 from codecs import BOM_UTF8, BOM_UTF16
 from typing import Any, Dict, IO, List, Optional, Set, Union
 from urllib.parse import urlparse
 
 from assemblyline.common.str_utils import safe_str
 from assemblyline.odm import DOMAIN_REGEX, IP_ONLY_REGEX, IP_REGEX, URI_PATH
-from assemblyline_v4_service.common import result
 from assemblyline_v4_service.common.base import ServiceBase
 from assemblyline_v4_service.common.extractor.base64 import base64_search
 from assemblyline_v4_service.common.extractor.pe_file import find_pe_files
@@ -247,6 +247,11 @@ class ViperMonkey(ServiceBase):
             parameter: String to be searched
             section: Section to be modified if PowerShell found
         """
+        # If the parameter is in a list represented by a string, extract it
+        if parameter.startswith("[") and parameter.endswith("]"):
+            parameter = literal_eval(parameter)
+            if isinstance(parameter, list) and len(parameter) > 0:
+                parameter = parameter[0]
 
         if re.findall(r'(?:powershell)|(?:pwsh)', parameter, re.IGNORECASE):
             self.found_powershell = True
