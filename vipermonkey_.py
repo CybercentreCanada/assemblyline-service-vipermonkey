@@ -264,8 +264,8 @@ class ViperMonkey(ServiceBase):
                 powershell_file_path = os.path.join(self.working_directory, powershell_filename)
                 with open(powershell_file_path, 'w') as f:
                     f.write(parameter)
-                    self.request.add_extracted(powershell_file_path, powershell_filename,
-                                               'Discovered PowerShell code in parameter')
+                self.request.add_extracted(powershell_file_path, powershell_filename,
+                                           'Discovered PowerShell code in parameter')
 
     def find_ip(self, parameter: str) -> None:
         """
