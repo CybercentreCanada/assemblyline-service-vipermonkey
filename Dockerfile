@@ -21,8 +21,6 @@ RUN pypy -m ensurepip
 RUN pypy -m pip install --no-cache-dir -U pip
 
 RUN pypy -m pip install colorlog==5.0.0
-# Temporary fix until vipermonkey accepts pull request
-RUN pypy -m pip install unidecode==1.2.0
 RUN pypy -m pip install --no-cache-dir -U https://github.com/decalage2/ViperMonkey/archive/master.zip
 RUN pypy -m pip install --no-cache-dir assemblyline_v4_p2compat pyparsing==2.2.0
 
