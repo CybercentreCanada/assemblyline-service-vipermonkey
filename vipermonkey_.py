@@ -40,7 +40,6 @@ class ViperMonkey(ServiceBase):
         self.found_powershell = False
         self.file_hashes: List[str] = []
 
-        self.request: Optional[ServiceRequest] = None
         self.result: Optional[Result] = None
 
     def start(self) -> None:
@@ -49,7 +48,6 @@ class ViperMonkey(ServiceBase):
     def execute(self, request: ServiceRequest) -> None:
         self.result = Result()
         request.result = self.result
-        self.request = request
 
         self.ip_list = []
         self.url_list = []
@@ -163,7 +161,7 @@ class ViperMonkey(ServiceBase):
                         # Parameters includes more than strings (booleans for example)
                         if isinstance(item, str):
                             # Check for PowerShell
-                            self.extract_powershell(item, sub_action_section)
+                            self.extract_powershell(item, sub_action_section, request)
                     # Join list items into single string
                     param = ', '.join(str(p) for p in parameters)
 
@@ -171,7 +169,7 @@ class ViperMonkey(ServiceBase):
                     param = parameters
                     # Parameters includes more than strings (booleans for example)
                     if isinstance(param, str):
-                        self.extract_powershell(param, sub_action_section)
+                        self.extract_powershell(param, sub_action_section, request)
 
                 # If the description field was empty, re-organize result section for this case
                 if description == action:
@@ -187,7 +185,7 @@ class ViperMonkey(ServiceBase):
         # Check tmp_iocs
         res_temp_iocs = ResultSection('Runtime temporary IOCs')
         for ioc in tmp_iocs:
-            self.extract_powershell(ioc, res_temp_iocs)
+            self.extract_powershell(ioc, res_temp_iocs, request)
             potential_base64.add(ioc)
             self.find_ip(ioc)
 
@@ -235,12 +233,12 @@ class ViperMonkey(ServiceBase):
             with open(temp_log_copy, "w") as temp_log_file:
                 temp_log_file.write(output_results['stdout'])
 
-            self.request.add_supplementary(temp_log_copy, 'vipermonkey_output.log', 'ViperMonkey log output')
+            request.add_supplementary(temp_log_copy, 'vipermonkey_output.log', 'ViperMonkey log output')
             if vmonkey_err is True:
                 ResultSection('ViperMonkey has encountered an error, please check "vipermonkey_output.log"',
                               parent=self.result, heuristic=Heuristic(1))
 
-    def extract_powershell(self, parameter: str, section: ResultSection) -> None:
+    def extract_powershell(self, parameter: str, section: ResultSection, request: ServiceRequest) -> None:
         """Searches parameter for PowerShell, adds as extracted if found
 
         Args:
@@ -249,27 +247,23 @@ class ViperMonkey(ServiceBase):
         """
         # If the parameter is in a list represented by a string, extract it
         if parameter.startswith("[") and parameter.endswith("]"):
-            parameter = literal_eval(parameter)
-            if isinstance(parameter, list) and len(parameter) > 0:
-                parameter = parameter[0]
-
-        if re.findall(r'(?:powershell)|(?:pwsh)', parameter, re.IGNORECASE):
+            evaluated = literal_eval(parameter)
+            if isinstance(evaluated, list) and len(evaluated) > 0 and isinstance(evaluated[0], str):
+                parameter = evaluated[0]
+        powershell = re.search(r'\b(?:powershell)|(?:pwsh)\b.{0,100}', parameter, re.IGNORECASE)
+        if powershell:
             self.found_powershell = True
-            if isinstance(parameter, str):
-                # Unicode-objects must be encoded before hashing
-                sha256hash = hashlib.sha256(parameter.encode()).hexdigest()
-            else:
-                sha256hash = hashlib.sha256(parameter).hexdigest()
-            ResultSection('Discovered PowerShell code in parameter.', parent=section)
+            sha256hash = hashlib.sha256(parameter.encode()).hexdigest()
+            powershell_filename = f'{sha256hash[0:25]}_extracted_powershell'
+            ResultSection('Discovered PowerShell code in parameter.', parent=section, body=powershell.group(0)+f'... see [{powershell_filename}]')
 
             # Add PowerShell code as extracted, account for duplicates
             if sha256hash not in self.file_hashes:
                 self.file_hashes.append(sha256hash)
-                powershell_filename = f'{sha256hash[0:25]}_extracted_powershell'
                 powershell_file_path = os.path.join(self.working_directory, powershell_filename)
                 with open(powershell_file_path, 'w') as f:
                     f.write(parameter)
-                self.request.add_extracted(powershell_file_path, powershell_filename,
+                request.add_extracted(powershell_file_path, powershell_filename,
                                            'Discovered PowerShell code in parameter')
 
     def find_ip(self, parameter: str) -> None:
