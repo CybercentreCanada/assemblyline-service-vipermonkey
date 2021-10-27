@@ -21,7 +21,7 @@ PYTHON2_INTERPRETER = os.environ.get("PYTHON2_INTERPRETER", "pypy")
 R_URI = f"(?:(?:(?:https?|ftp):)?//)(?:\\S+(?::\\S*)?@)?(?:{IP_REGEX}|{DOMAIN_REGEX})(?::\\d{{2,5}})?{URI_PATH}?"
 R_IP = f'{IP_REGEX}(?::\\d{{1,4}})?'
 
-FILE_PARAMETER_SIZE = 500
+FILE_PARAMETER_SIZE = 1000
 
 def truncate(data: Union[bytes, str], length: int = 100) -> str:
     """ Helper to avoid cluttering output """
@@ -335,9 +335,14 @@ class ViperMonkey(ServiceBase):
 
         for match, content in base64_search(data.encode()).items():
             try:
+                # Powershell base64 will be utf-16
+                content = content.decode('utf-16').encode()
+            except UnicodeDecodeError:
+                pass
+            try:
                 if len(content) < FILE_PARAMETER_SIZE:
                     decoded_param = decoded_param.replace(match.decode(),
-                                           ' ' + content.decode('utf-16', errors='ignore'))
+                                           ' ' + content.decode(errors='ignore'))
                 else:
                     b64hash = ''
                     pe_files = find_pe_files(content)
