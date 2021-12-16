@@ -342,7 +342,7 @@ class ViperMonkey(ServiceBase):
                 else:
                     b64hash = ''
                     pe_files = find_pe_files(content)
-                    for pe_file in pe_files:
+                    for pe_file, _, _ in pe_files:
                         b64hash = hashlib.sha256(pe_file).hexdigest()
                         pe_path = os.path.join(self.working_directory, b64hash)
                         with open(pe_path, 'wb') as f:
@@ -356,7 +356,7 @@ class ViperMonkey(ServiceBase):
                             f.write(content)
                         request.add_extracted(content_path, b64hash, 'Large base64 encoded parameter')
                         section.heuristic.add_signature_id('possible_file')
-                    decoded_param = decoded_param.replace(match.decode(), f'[See extracted file {b64hash}]')
+                    decoded_param = decoded_param[:start] + f'[See extracted file {b64hash}]' + decoded_param[:end]
                 decoded = True
             except Exception:
                 pass
