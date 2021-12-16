@@ -4,7 +4,6 @@ import os
 import re
 import subprocess
 import tempfile
-from ast import literal_eval
 from codecs import BOM_UTF8, BOM_UTF16
 from typing import Any, Dict, IO, List, Optional, Set, Union
 from urllib.parse import urlparse
@@ -12,7 +11,7 @@ from urllib.parse import urlparse
 from assemblyline.common.str_utils import safe_str
 from assemblyline.odm import DOMAIN_REGEX, IP_ONLY_REGEX, IP_REGEX, URI_PATH
 from assemblyline_v4_service.common.base import ServiceBase
-from assemblyline_v4_service.common.extractor.base64 import base64_search
+from assemblyline_v4_service.common.extractor.base64 import find_base64
 from assemblyline_v4_service.common.extractor.pe_file import find_pe_files
 from assemblyline_v4_service.common.request import ServiceRequest
 from assemblyline_v4_service.common.result import BODY_FORMAT, Heuristic, Result, ResultSection
@@ -245,26 +244,24 @@ class ViperMonkey(ServiceBase):
             parameter: String to be searched
             section: Section to be modified if PowerShell found
         """
-        # If the parameter is in a list represented by a string, extract it
-        if parameter.startswith("[") and parameter.endswith("]"):
-            evaluated = literal_eval(parameter)
-            if isinstance(evaluated, list) and len(evaluated) > 0 and isinstance(evaluated[0], str):
-                parameter = evaluated[0]
-        powershell = re.search(r'\b(?:powershell)|(?:pwsh)\b.{0,100}', parameter, re.IGNORECASE)
-        if powershell:
-            self.found_powershell = True
-            sha256hash = hashlib.sha256(parameter.encode()).hexdigest()
-            powershell_filename = f'{sha256hash[0:25]}_extracted_powershell'
-            ResultSection('Discovered PowerShell code in parameter.', parent=section, body=powershell.group(0)+f'... see [{powershell_filename}]')
+        match = re.search(r"'([^']*\b(?:powershell|pwsh)\b[^']*)'", parameter, re.IGNORECASE)
+        if match:
+            powershell = match.group(1)
+        else:
+            return
+        self.found_powershell = True
+        sha256hash = hashlib.sha256(powershell.encode()).hexdigest()
+        powershell_filename = f'{sha256hash[0:25]}_extracted_powershell'
+        ResultSection('Discovered PowerShell code in parameter.', parent=section, body=powershell[:100]+f'... see [{powershell_filename}]')
 
-            # Add PowerShell code as extracted, account for duplicates
-            if sha256hash not in self.file_hashes:
-                self.file_hashes.append(sha256hash)
-                powershell_file_path = os.path.join(self.working_directory, powershell_filename)
-                with open(powershell_file_path, 'w') as f:
-                    f.write(parameter)
-                request.add_extracted(powershell_file_path, powershell_filename,
-                                           'Discovered PowerShell code in parameter')
+        # Add PowerShell code as extracted, account for duplicates
+        if sha256hash not in self.file_hashes:
+            self.file_hashes.append(sha256hash)
+            powershell_file_path = os.path.join(self.working_directory, powershell_filename)
+            with open(powershell_file_path, 'w') as f:
+                f.write(powershell)
+            request.add_extracted(powershell_file_path, powershell_filename,
+                                  'Discovered PowerShell code in parameter')
 
     def find_ip(self, parameter: str) -> None:
         """
@@ -333,7 +330,7 @@ class ViperMonkey(ServiceBase):
         decoded_param = data
         decoded = False
 
-        for match, content in base64_search(data.encode()).items():
+        for content, start, end in find_base64(data.encode()):
             try:
                 # Powershell base64 will be utf-16
                 content = content.decode('utf-16').encode()
@@ -341,8 +338,7 @@ class ViperMonkey(ServiceBase):
                 pass
             try:
                 if len(content) < FILE_PARAMETER_SIZE:
-                    decoded_param = decoded_param.replace(match.decode(),
-                                           ' ' + content.decode(errors='ignore'))
+                    decoded_param = decoded_param[:start] + ' ' + content.decode(errors='ignore') + decoded_param[end:]
                 else:
                     b64hash = ''
                     pe_files = find_pe_files(content)
