@@ -22,6 +22,7 @@ R_IP = f'{IP_REGEX}(?::\\d{{1,4}})?'
 
 FILE_PARAMETER_SIZE = 1000
 
+
 def truncate(data: Union[bytes, str], length: int = 100) -> str:
     """ Helper to avoid cluttering output """
     string = safe_str(data)
@@ -30,6 +31,8 @@ def truncate(data: Union[bytes, str], length: int = 100) -> str:
     return string
 
 # noinspection PyBroadException
+
+
 class ViperMonkey(ServiceBase):
     def __init__(self, config: Optional[Dict] = None) -> None:
         super().__init__(config)
@@ -139,7 +142,7 @@ class ViperMonkey(ServiceBase):
             action_section.add_tag('technique.macro', 'Contains VBA Macro(s)')
             sub_action_sections: Dict[str, ResultSection] = {}
             for action, parameters, description in actions:    # Creating action sub-sections for each action
-                if not description: # For actions with no description, just use the type of action
+                if not description:  # For actions with no description, just use the type of action
                     description = action
 
                 if description not in sub_action_sections:
@@ -252,7 +255,8 @@ class ViperMonkey(ServiceBase):
         self.found_powershell = True
         sha256hash = hashlib.sha256(powershell.encode()).hexdigest()
         powershell_filename = f'{sha256hash[0:25]}_extracted_powershell'
-        ResultSection('Discovered PowerShell code in parameter.', parent=section, body=powershell[:100]+f'... see [{powershell_filename}]')
+        ResultSection('Discovered PowerShell code in parameter.', parent=section,
+                      body=powershell[:100]+f'... see [{powershell_filename}]')
 
         # Add PowerShell code as extracted, account for duplicates
         if sha256hash not in self.file_hashes:
@@ -342,7 +346,7 @@ class ViperMonkey(ServiceBase):
                 else:
                     b64hash = ''
                     pe_files = find_pe_files(content)
-                    for pe_file, _, _ in pe_files:
+                    for pe_file in pe_files:
                         b64hash = hashlib.sha256(pe_file).hexdigest()
                         pe_path = os.path.join(self.working_directory, b64hash)
                         with open(pe_path, 'wb') as f:
