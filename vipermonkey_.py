@@ -95,7 +95,7 @@ class ViperMonkey(ServiceBase):
             p = subprocess.run(cmd, capture_output=True, shell=True)
             stdout = p.stdout
 
-            if input_file_obj:
+            if input_file_obj and os.path.exists(input_file_obj.name):
                 input_file_obj.close()
 
             # Read output
