@@ -342,7 +342,7 @@ class ViperMonkey(ServiceBase):
                 else:
                     b64hash = ''
                     pe_files = find_pe_files(content)
-                    for pe_file, _, _ in pe_files:
+                    for pe_file in pe_files:
                         b64hash = hashlib.sha256(pe_file).hexdigest()
                         pe_path = os.path.join(self.working_directory, b64hash)
                         with open(pe_path, 'wb') as f:
