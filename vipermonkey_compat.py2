@@ -51,7 +51,10 @@ if __name__ == "__main__":
             sys.stdout = my_stdout = StringIO()
             sys.stderr = my_stderr = StringIO()
 
-            vmonkey_values = process_file(None, file_to_scan, None)
+            vmonkey_values = process_file(None, file_to_scan, None,
+                                          strip_useless=True,
+                                          display_int_iocs=True,
+                                          artifact_dir=sys.argv[2] if len(sys.argv) > 2 else None)
 
             # Release stdout and stderr
             sys.stdout = old_stdout
