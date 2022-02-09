@@ -22,6 +22,7 @@ R_IP = f'{IP_REGEX}(?::\\d{{1,4}})?'
 
 FILE_PARAMETER_SIZE = 1000
 
+
 def truncate(data: Union[bytes, str], length: int = 100) -> str:
     """ Helper to avoid cluttering output """
     string = safe_str(data)
@@ -30,6 +31,8 @@ def truncate(data: Union[bytes, str], length: int = 100) -> str:
     return string
 
 # noinspection PyBroadException
+
+
 class ViperMonkey(ServiceBase):
     def __init__(self, config: Optional[Dict] = None) -> None:
         super().__init__(config)
@@ -98,7 +101,7 @@ class ViperMonkey(ServiceBase):
                 if os.path.isfile(file_path):
                     request.add_extracted(file_path, file, 'File extracted by ViperMonkey during analysis')
 
-            if input_file_obj:
+            if input_file_obj and os.path.exists(input_file_obj.name):
                 input_file_obj.close()
 
             # Read output
@@ -145,7 +148,7 @@ class ViperMonkey(ServiceBase):
             action_section.add_tag('technique.macro', 'Contains VBA Macro(s)')
             sub_action_sections: Dict[str, ResultSection] = {}
             for action, parameters, description in actions:    # Creating action sub-sections for each action
-                if not description: # For actions with no description, just use the type of action
+                if not description:  # For actions with no description, just use the type of action
                     description = action
 
                 if description not in sub_action_sections:
@@ -258,7 +261,8 @@ class ViperMonkey(ServiceBase):
         self.found_powershell = True
         sha256hash = hashlib.sha256(powershell.encode()).hexdigest()
         powershell_filename = f'{sha256hash[0:25]}_extracted_powershell'
-        ResultSection('Discovered PowerShell code in parameter.', parent=section, body=powershell[:100]+f'... see [{powershell_filename}]')
+        ResultSection('Discovered PowerShell code in parameter.', parent=section,
+                      body=powershell[:100]+f'... see [{powershell_filename}]')
 
         # Add PowerShell code as extracted, account for duplicates
         if sha256hash not in self.file_hashes:

@@ -20,7 +20,7 @@ RUN ln -s /opt/${pypy}-linux64/bin/pypy /usr/local/bin/pypy
 RUN pypy -m ensurepip
 RUN pypy -m pip install --no-cache-dir -U pip
 
-RUN pypy -m pip install colorlog==5.0.0
+RUN pypy -m pip install colorlog==5.0.0 regex==2021.11.10
 # Temp replacement until upstream merges changes
 RUN pypy -m pip install --no-cache-dir -U https://github.com/cccs-jh/ViperMonkey/archive/kirk.zip
 RUN pypy -m pip install --no-cache-dir assemblyline_v4_p2compat pyparsing==2.2.0
