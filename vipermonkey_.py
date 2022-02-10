@@ -88,21 +88,23 @@ class ViperMonkey(ServiceBase):
                     # If the file_type was detected as XML, it's probably buried within but not actually an XML file
                     # Give no response as ViperMonkey can't process this kind of file
                     return
-            artifact_dir = os.path.join(self.working_directory, request.sha256)
             cmd = " ".join([PYTHON2_INTERPRETER,
                             os.path.join(os.path.dirname(__file__), 'vipermonkey_compat.py2'),
                             input_file,
-                            artifact_dir])
+                            self.working_directory])
             p = subprocess.run(cmd, capture_output=True, shell=True)
             stdout = p.stdout
 
+            # Close file
+            if input_file_obj and os.path.exists(input_file_obj.name):
+                input_file_obj.close()
+
+            # Add artifacts
+            artifact_dir = os.path.join(self.working_directory, os.path.basename(input_file) + '_artifacts')
             for file in os.listdir(artifact_dir):
                 file_path = os.path.join(artifact_dir, file)
                 if os.path.isfile(file_path):
                     request.add_extracted(file_path, file, 'File extracted by ViperMonkey during analysis')
-
-            if input_file_obj and os.path.exists(input_file_obj.name):
-                input_file_obj.close()
 
             # Read output
             if stdout:
