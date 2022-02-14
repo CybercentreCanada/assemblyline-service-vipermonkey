@@ -107,8 +107,8 @@ class ViperMonkey(ServiceBase):
                         file_path = os.path.join(artifact_dir, file)
                         if os.path.isfile(file_path) and os.path.getsize(file_path):
                             request.add_extracted(file_path, file, 'File extracted by ViperMonkey during analysis')
-                    except os.error:
-                        pass
+                    except os.error as e:
+                        self.log.warning(e)
 
             # Read output
             if stdout:
