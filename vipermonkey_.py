@@ -101,10 +101,14 @@ class ViperMonkey(ServiceBase):
 
             # Add artifacts
             artifact_dir = os.path.join(self.working_directory, os.path.basename(input_file) + '_artifacts')
-            for file in os.listdir(artifact_dir):
-                file_path = os.path.join(artifact_dir, file)
-                if os.path.isfile(file_path):
-                    request.add_extracted(file_path, file, 'File extracted by ViperMonkey during analysis')
+            if os.path.exists(artifact_dir):
+                for file in os.listdir(artifact_dir):
+                    try:
+                        file_path = os.path.join(artifact_dir, file)
+                        if os.path.isfile(file_path) and os.path.getsize(file_path):
+                            request.add_extracted(file_path, file, 'File extracted by ViperMonkey during analysis')
+                    except os.error as e:
+                        self.log.warning(e)
 
             # Read output
             if stdout:
