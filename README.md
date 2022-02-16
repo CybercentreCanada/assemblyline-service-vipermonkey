@@ -19,3 +19,7 @@ This service uses Decalage's ViperMonkey (https://github.com/decalage2/ViperMonk
         network.static.uri
         network.port
         technique.macro
+
+### Safety
+
+ViperMonkey may use eval() to speed up emulation. This service should be run in a sandboxed environment, which Assemblyline does by default for non-privileged services. This service should not be run in privileged mode.
