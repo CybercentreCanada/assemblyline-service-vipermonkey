@@ -5,6 +5,7 @@ import re
 import subprocess
 import tempfile
 from codecs import BOM_UTF8, BOM_UTF16
+from this import d
 from typing import Any, Dict, IO, List, Optional, Set, Union
 from urllib.parse import urlparse
 
@@ -15,6 +16,8 @@ from assemblyline_v4_service.common.extractor.base64 import find_base64
 from assemblyline_v4_service.common.extractor.pe_file import find_pe_files
 from assemblyline_v4_service.common.request import ServiceRequest
 from assemblyline_v4_service.common.result import BODY_FORMAT, Heuristic, Result, ResultSection
+
+from vba_builtins import vba_builtins
 
 PYTHON2_INTERPRETER = os.environ.get("PYTHON2_INTERPRETER", "pypy")
 R_URI = f"(?:(?:(?:https?|ftp):)?//)(?:\\S+(?::\\S*)?@)?(?:{IP_REGEX}|{DOMAIN_REGEX})(?::\\d{{2,5}})?{URI_PATH}?"
@@ -213,7 +216,7 @@ class ViperMonkey(ServiceBase):
         # Check parameters and temp_iocs for base64
         base64_section = ResultSection('Possible Base64 found', heuristic=Heuristic(5, frequency=0))
         for param in potential_base64:
-            self.check_for_b64(param, base64_section, request)
+            self.check_for_b64(param, base64_section, request, request.file_contents)
         if base64_section.body:
             self.result.add_section(base64_section)
 
@@ -222,22 +225,11 @@ class ViperMonkey(ServiceBase):
 
         # Create section for built-in VBA functions called
         if len(external_functions) > 0:
-            vba_builtin_dict = {}
-            dict_path = os.path.join(os.path.dirname(__file__), 'VBA_built_ins.txt')
-            with open(dict_path, 'r') as f:
-                for line in f:
-                    line = line.strip()
-                    if re.search(r'^#', line):
-                        continue
-                    if line:
-                        split_line = line.split(';')
-                        vba_builtin_dict[split_line[0].strip()] = split_line[1].strip()
-
             external_func_section = ResultSection('VBA functions called', body_format=BODY_FORMAT.MEMORY_DUMP,
                                                   parent=self.result)
             for func in external_functions:
-                if func in vba_builtin_dict:
-                    external_func_section.add_line(func + ': ' + vba_builtin_dict[func])
+                if func in vba_builtins:
+                    external_func_section.add_line(func + ': ' + vba_builtins[func])
                 else:
                     external_func_section.add_line(func)
 
@@ -331,7 +323,7 @@ class ViperMonkey(ServiceBase):
                 else:
                     sec_iocs.add_tag('network.static.ip', ip)
 
-    def check_for_b64(self, data: str, section: ResultSection, request: ServiceRequest) -> bool:
+    def check_for_b64(self, data: str, section: ResultSection, request: ServiceRequest, file_contents: bytes) -> bool:
         """Search and decode base64 strings in sample data.
 
         Args:
@@ -346,7 +338,11 @@ class ViperMonkey(ServiceBase):
         decoded_param = data
         decoded = False
 
-        for content, start, end in find_base64(data.encode()):
+        encoded_data = data.encode()
+        for content, start, end in find_base64(encoded_data):
+            if encoded_data[start:end] in file_contents:
+                # Present in original file, not an intermediate IoC
+                continue
             try:
                 # Powershell base64 will be utf-16
                 content = content.decode('utf-16').encode()
@@ -372,7 +368,7 @@ class ViperMonkey(ServiceBase):
                             f.write(content)
                         request.add_extracted(content_path, b64hash, 'Large base64 encoded parameter')
                         section.heuristic.add_signature_id('possible_file')
-                    decoded_param = decoded_param[:start] + f'[See extracted file {b64hash}]' + decoded_param[:end]
+                    decoded_param = decoded_param[:start] + f'[See extracted file {b64hash}]' + decoded_param[end:]
                 decoded = True
             except Exception:
                 pass

@@ -2,7 +2,7 @@ name: ViperMonkey
 version: $SERVICE_TAG
 description: Office File VBA Macro Magnet.
 
-accepts: (document/office/.*|code/xml|code/vbs)
+accepts: (document/office/.*|code/vbs)
 rejects: empty|metadata/.*|document/office/onenote
 
 stage: CORE
