@@ -16,6 +16,8 @@ enabled: true
 is_external: false
 licence_count: 0
 
+privileged: false # Warning: ViperMonkey may use eval, do not set to true
+
 heuristics:
   - heur_id: 1
     name: ViperMonkey Error
