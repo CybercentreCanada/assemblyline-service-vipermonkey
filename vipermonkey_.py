@@ -5,7 +5,6 @@ import re
 import subprocess
 import tempfile
 from codecs import BOM_UTF8, BOM_UTF16
-from this import d
 from typing import Any, Dict, IO, List, Optional, Set, Union
 from urllib.parse import urlparse
 
