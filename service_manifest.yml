@@ -28,6 +28,7 @@ heuristics:
   - heur_id: 2
     name: Shell Function Found
     score: 100
+    max_score: 500
     filetype: (document/.*|code/xml)
     description: Shell function found by ViperMonkey
 
