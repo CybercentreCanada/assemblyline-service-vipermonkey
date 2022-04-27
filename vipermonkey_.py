@@ -5,7 +5,7 @@ import re
 import subprocess
 import tempfile
 from codecs import BOM_UTF8, BOM_UTF16
-from typing import Any, Dict, IO, List, Optional, Set, Union
+from typing import IO, Any, Dict, List, Optional, Set, Union
 from urllib.parse import urlparse
 
 from assemblyline.common.str_utils import safe_str
@@ -14,23 +14,29 @@ from assemblyline_v4_service.common.base import ServiceBase
 from assemblyline_v4_service.common.extractor.base64 import find_base64
 from assemblyline_v4_service.common.extractor.pe_file import find_pe_files
 from assemblyline_v4_service.common.request import ServiceRequest
-from assemblyline_v4_service.common.result import BODY_FORMAT, Heuristic, Result, ResultSection
+from assemblyline_v4_service.common.result import (
+    BODY_FORMAT,
+    Heuristic,
+    Result,
+    ResultSection,
+)
 
 from vba_builtins import vba_builtins
 
 PYTHON2_INTERPRETER = os.environ.get("PYTHON2_INTERPRETER", "pypy")
 R_URI = f"(?:(?:(?:https?|ftp):)?//)(?:\\S+(?::\\S*)?@)?(?:{IP_REGEX}|{DOMAIN_REGEX})(?::\\d{{2,5}})?{URI_PATH}?"
-R_IP = f'{IP_REGEX}(?::\\d{{1,4}})?'
+R_IP = f"{IP_REGEX}(?::\\d{{1,4}})?"
 
 FILE_PARAMETER_SIZE = 1000
 
 
 def truncate(data: Union[bytes, str], length: int = 100) -> str:
-    """ Helper to avoid cluttering output """
+    """Helper to avoid cluttering output"""
     string = safe_str(data)
     if len(string) > length:
-        return string[:length] + '...'
+        return string[:length] + "..."
     return string
+
 
 # noinspection PyBroadException
 
@@ -47,7 +53,7 @@ class ViperMonkey(ServiceBase):
         self.result: Optional[Result] = None
 
     def start(self) -> None:
-        self.log.debug('ViperMonkey service started')
+        self.log.debug("ViperMonkey service started")
 
     def execute(self, request: ServiceRequest) -> None:
         self.result = Result()
@@ -71,29 +77,33 @@ class ViperMonkey(ServiceBase):
             input_file: str = request.file_path
             input_file_obj: Optional[IO] = None
             # Typical start to XML files
-            if not file_contents.startswith(b'<?') and request.file_type == 'code/xml':
+            if not file_contents.startswith(b"<?") and request.file_type == "code/xml":
                 # Default encoding/decoding if BOM not found
                 encoding: Optional[str] = None
                 decoding: Optional[str] = None
                 # Remove potential BOMs from contents
                 if file_contents.startswith(BOM_UTF8):
-                    encoding = 'utf-8'
-                    decoding = 'utf-8-sig'
+                    encoding = "utf-8"
+                    decoding = "utf-8-sig"
                 elif file_contents.startswith(BOM_UTF16):
-                    encoding = 'utf-16'
-                    decoding = 'utf-16'
+                    encoding = "utf-16"
+                    decoding = "utf-16"
                 if encoding and decoding:
-                    input_file_obj = tempfile.NamedTemporaryFile('w+', encoding=encoding)
-                    input_file_obj.write(file_contents.decode(decoding, errors='ignore'))
+                    input_file_obj = tempfile.NamedTemporaryFile("w+", encoding=encoding)
+                    input_file_obj.write(file_contents.decode(decoding, errors="ignore"))
                     input_file = input_file_obj.name
                 else:
                     # If the file_type was detected as XML, it's probably buried within but not actually an XML file
                     # Give no response as ViperMonkey can't process this kind of file
                     return
-            cmd = " ".join([PYTHON2_INTERPRETER,
-                            os.path.join(os.path.dirname(__file__), 'vipermonkey_compat.py2'),
-                            input_file,
-                            self.working_directory])
+            cmd = " ".join(
+                [
+                    PYTHON2_INTERPRETER,
+                    os.path.join(os.path.dirname(__file__), "vipermonkey_compat.py2"),
+                    input_file,
+                    self.working_directory,
+                ]
+            )
             p = subprocess.run(cmd, capture_output=True, shell=True)
             stdout = p.stdout
 
@@ -102,13 +112,13 @@ class ViperMonkey(ServiceBase):
                 input_file_obj.close()
 
             # Add artifacts
-            artifact_dir = os.path.join(self.working_directory, os.path.basename(input_file) + '_artifacts')
+            artifact_dir = os.path.join(self.working_directory, os.path.basename(input_file) + "_artifacts")
             if os.path.exists(artifact_dir):
                 for file in os.listdir(artifact_dir):
                     try:
                         file_path = os.path.join(artifact_dir, file)
                         if os.path.isfile(file_path) and os.path.getsize(file_path):
-                            request.add_extracted(file_path, file, 'File extracted by ViperMonkey during analysis')
+                            request.add_extracted(file_path, file, "File extracted by ViperMonkey during analysis")
                     except os.error as e:
                         self.log.warning(e)
 
@@ -125,8 +135,8 @@ class ViperMonkey(ServiceBase):
                 # Checking for tuple in case vmonkey return is None
                 # If no macros found, return is [][][], if error, return is None
                 # vmonkey_err can still happen if return is [][][], log as warning instead of error
-                if isinstance(output_results.get('vmonkey_values'), dict):
-                    '''
+                if isinstance(output_results.get("vmonkey_values"), dict):
+                    """
                     Structure of variable "actions" is as follows:
                     [action, parameters, description]
                     action: 'Found Entry Point', 'Execute Command', etc...
@@ -135,13 +145,13 @@ class ViperMonkey(ServiceBase):
 
                     external_functions is a list of built-in VBA functions
                     that were called
-                    '''
-                    actions = output_results['vmonkey_values']['actions']
-                    external_functions = output_results['vmonkey_values']['external_funcs']
-                    tmp_iocs = output_results['vmonkey_values']['tmp_iocs']
-                    if output_results['vmonkey_err']:
+                    """
+                    actions = output_results["vmonkey_values"]["actions"]
+                    external_functions = output_results["vmonkey_values"]["external_funcs"]
+                    tmp_iocs = output_results["vmonkey_values"]["tmp_iocs"]
+                    if output_results["vmonkey_err"]:
                         vmonkey_err = True
-                        self.log.warning(output_results['vmonkey_err'])
+                        self.log.warning(output_results["vmonkey_err"])
                 else:
                     vmonkey_err = True
             else:
@@ -152,10 +162,10 @@ class ViperMonkey(ServiceBase):
 
         if actions:
             # Creating action section
-            action_section = ResultSection('Recorded Actions:', parent=self.result)
-            action_section.add_tag('technique.macro', 'Contains VBA Macro(s)')
+            action_section = ResultSection("Recorded Actions:", parent=self.result)
+            action_section.add_tag("technique.macro", "Contains VBA Macro(s)")
             sub_action_sections: Dict[str, ResultSection] = {}
-            for action, parameters, description in actions:    # Creating action sub-sections for each action
+            for action, parameters, description in actions:  # Creating action sub-sections for each action
                 if not description:  # For actions with no description, just use the type of action
                     description = action
 
@@ -163,7 +173,7 @@ class ViperMonkey(ServiceBase):
                     # Action's description will be the sub-section name
                     sub_action_section = ResultSection(description, parent=action_section)
                     sub_action_sections[description] = sub_action_section
-                    if description == 'Shell function':
+                    if description == "Shell function":
                         sub_action_section.set_heuristic(2)
                 else:
                     # Reuse existing section
@@ -179,7 +189,7 @@ class ViperMonkey(ServiceBase):
                             # Check for PowerShell
                             self.extract_powershell(item, sub_action_section, request)
                     # Join list items into single string
-                    param = ', '.join(str(p) for p in parameters)
+                    param = ", ".join(str(p) for p in parameters)
 
                 else:
                     param = parameters
@@ -191,7 +201,7 @@ class ViperMonkey(ServiceBase):
                 if description == action:
                     sub_action_section.add_line(param)
                 else:
-                    sub_action_section.add_line(f'Action: {action}, Parameters: {param}')
+                    sub_action_section.add_line(f"Action: {action}, Parameters: {param}")
 
                 # Check later for base64
                 potential_base64.add(param)
@@ -199,7 +209,7 @@ class ViperMonkey(ServiceBase):
                 # Add urls/ips found in parameter to respective lists
                 self.find_ip(param)
         # Check tmp_iocs
-        res_temp_iocs = ResultSection('Runtime temporary IOCs')
+        res_temp_iocs = ResultSection("Runtime temporary IOCs")
         for ioc in tmp_iocs:
             self.extract_powershell(ioc, res_temp_iocs, request)
             potential_base64.add(ioc)
@@ -210,10 +220,10 @@ class ViperMonkey(ServiceBase):
 
         # Add PowerShell score/tag if found
         if self.found_powershell:
-            ResultSection('Discovered PowerShell code in file', parent=self.result, heuristic=Heuristic(3))
+            ResultSection("Discovered PowerShell code in file", parent=self.result, heuristic=Heuristic(3))
 
         # Check parameters and temp_iocs for base64
-        base64_section = ResultSection('Possible Base64 found', heuristic=Heuristic(5, frequency=0))
+        base64_section = ResultSection("Possible Base64 found", heuristic=Heuristic(5, frequency=0))
         for param in potential_base64:
             self.check_for_b64(param, base64_section, request, request.file_contents)
         if base64_section.body:
@@ -224,24 +234,28 @@ class ViperMonkey(ServiceBase):
 
         # Create section for built-in VBA functions called
         if len(external_functions) > 0:
-            external_func_section = ResultSection('VBA functions called', body_format=BODY_FORMAT.MEMORY_DUMP,
-                                                  parent=self.result)
+            external_func_section = ResultSection(
+                "VBA functions called", body_format=BODY_FORMAT.MEMORY_DUMP, parent=self.result
+            )
             for func in external_functions:
                 if func in vba_builtins:
-                    external_func_section.add_line(func + ': ' + vba_builtins[func])
+                    external_func_section.add_line(func + ": " + vba_builtins[func])
                 else:
                     external_func_section.add_line(func)
 
         # Add vmonkey log as a supplemental file if we have results
-        if 'stdout' in output_results and (vmonkey_err or request.result.sections):
-            temp_log_copy = os.path.join(tempfile.gettempdir(), f'{request.sid}_vipermonkey_output.log')
+        if "stdout" in output_results and (vmonkey_err or request.result.sections):
+            temp_log_copy = os.path.join(tempfile.gettempdir(), f"{request.sid}_vipermonkey_output.log")
             with open(temp_log_copy, "w") as temp_log_file:
-                temp_log_file.write(output_results['stdout'])
+                temp_log_file.write(output_results["stdout"])
 
-            request.add_supplementary(temp_log_copy, 'vipermonkey_output.log', 'ViperMonkey log output')
+            request.add_supplementary(temp_log_copy, "vipermonkey_output.log", "ViperMonkey log output")
             if vmonkey_err is True:
-                ResultSection('ViperMonkey has encountered an error, please check "vipermonkey_output.log"',
-                              parent=self.result, heuristic=Heuristic(1))
+                ResultSection(
+                    'ViperMonkey has encountered an error, please check "vipermonkey_output.log"',
+                    parent=self.result,
+                    heuristic=Heuristic(1),
+                )
 
     def extract_powershell(self, parameter: str, section: ResultSection, request: ServiceRequest) -> None:
         """Searches parameter for PowerShell, adds as extracted if found
@@ -257,18 +271,20 @@ class ViperMonkey(ServiceBase):
             return
         self.found_powershell = True
         sha256hash = hashlib.sha256(powershell.encode()).hexdigest()
-        powershell_filename = f'{sha256hash[0:25]}_extracted_powershell'
-        ResultSection('Discovered PowerShell code in parameter.', parent=section,
-                      body=powershell[:100]+f'... see [{powershell_filename}]')
+        powershell_filename = f"{sha256hash[0:25]}_extracted_powershell"
+        ResultSection(
+            "Discovered PowerShell code in parameter.",
+            parent=section,
+            body=powershell[:100] + f"... see [{powershell_filename}]",
+        )
 
         # Add PowerShell code as extracted, account for duplicates
         if sha256hash not in self.file_hashes:
             self.file_hashes.append(sha256hash)
             powershell_file_path = os.path.join(self.working_directory, powershell_filename)
-            with open(powershell_file_path, 'w') as f:
+            with open(powershell_file_path, "w") as f:
                 f.write(powershell)
-            request.add_extracted(powershell_file_path, powershell_filename,
-                                  'Discovered PowerShell code in parameter')
+            request.add_extracted(powershell_file_path, powershell_filename, "Discovered PowerShell code in parameter")
 
     def find_ip(self, parameter: str) -> None:
         """
@@ -278,7 +294,7 @@ class ViperMonkey(ServiceBase):
             parameter: String to be searched
         """
 
-        url_list = re.findall(r'https?://(?:[-\w.]|(?:[\da-zA-Z/?=%&]))+', parameter)
+        url_list = re.findall(r"https?://(?:[-\w.]|(?:[\da-zA-Z/?=%&]))+", parameter)
         ip_list = re.findall(R_IP, parameter)
 
         for url in url_list:
@@ -296,17 +312,18 @@ class ViperMonkey(ServiceBase):
         """
 
         if self.url_list or self.ip_list:
-            sec_iocs = ResultSection("ViperMonkey has found the following IOCs:",
-                                     parent=self.result, heuristic=Heuristic(4))
+            sec_iocs = ResultSection(
+                "ViperMonkey has found the following IOCs:", parent=self.result, heuristic=Heuristic(4)
+            )
 
             # Add Urls
             for url in set(self.url_list):
                 sec_iocs.add_line(url)
-                sec_iocs.add_tag('network.static.uri', url)
+                sec_iocs.add_tag("network.static.uri", url)
                 try:
                     parsed = urlparse(url)
                     if parsed.hostname and not re.match(IP_ONLY_REGEX, parsed.hostname):
-                        sec_iocs.add_tag('network.static.domain', parsed.hostname)
+                        sec_iocs.add_tag("network.static.domain", parsed.hostname)
 
                 except Exception:
                     pass
@@ -316,11 +333,11 @@ class ViperMonkey(ServiceBase):
                 sec_iocs.add_line(ip)
                 # Checking if IP ports also found and adding the corresponding tags
                 if re.findall(":", ip):
-                    net_ip, net_port = ip.split(':')
-                    sec_iocs.add_tag('network.static.ip', net_ip)
-                    sec_iocs.add_tag('network.port', net_port)
+                    net_ip, net_port = ip.split(":")
+                    sec_iocs.add_tag("network.static.ip", net_ip)
+                    sec_iocs.add_tag("network.port", net_port)
                 else:
-                    sec_iocs.add_tag('network.static.ip', ip)
+                    sec_iocs.add_tag("network.static.ip", ip)
 
     def check_for_b64(self, data: str, section: ResultSection, request: ServiceRequest, file_contents: bytes) -> bool:
         """Search and decode base64 strings in sample data.
@@ -344,37 +361,37 @@ class ViperMonkey(ServiceBase):
                 continue
             try:
                 # Powershell base64 will be utf-16
-                content = content.decode('utf-16').encode()
+                content = content.decode("utf-16").encode()
             except UnicodeDecodeError:
                 pass
             try:
                 if len(content) < FILE_PARAMETER_SIZE:
-                    decoded_param = decoded_param[:start] + ' ' + content.decode(errors='ignore') + decoded_param[end:]
+                    decoded_param = decoded_param[:start] + " " + content.decode(errors="ignore") + decoded_param[end:]
                 else:
-                    b64hash = ''
+                    b64hash = ""
                     pe_files = find_pe_files(content)
                     for pe_file in pe_files:
                         b64hash = hashlib.sha256(pe_file).hexdigest()
                         pe_path = os.path.join(self.working_directory, b64hash)
-                        with open(pe_path, 'wb') as f:
+                        with open(pe_path, "wb") as f:
                             f.write(pe_file)
-                        request.add_extracted(pe_path, b64hash, 'PE file found in base64 encoded parameter')
-                        section.heuristic.add_signature_id('pe_file')
+                        request.add_extracted(pe_path, b64hash, "PE file found in base64 encoded parameter")
+                        section.heuristic.add_signature_id("pe_file")
                     if not pe_files:
                         b64hash = hashlib.sha256(content).hexdigest()
                         content_path = os.path.join(self.working_directory, b64hash)
-                        with open(content_path, 'wb') as f:
+                        with open(content_path, "wb") as f:
                             f.write(content)
-                        request.add_extracted(content_path, b64hash, 'Large base64 encoded parameter')
-                        section.heuristic.add_signature_id('possible_file')
-                    decoded_param = decoded_param[:start] + f'[See extracted file {b64hash}]' + decoded_param[end:]
+                        request.add_extracted(content_path, b64hash, "Large base64 encoded parameter")
+                        section.heuristic.add_signature_id("possible_file")
+                    decoded_param = decoded_param[:start] + f"[See extracted file {b64hash}]" + decoded_param[end:]
                 decoded = True
             except Exception:
                 pass
 
         if decoded:
             section.heuristic.increment_frequency()
-            section.add_line(f'Possible Base64 {truncate(data)} decoded: {decoded_param}')
+            section.add_line(f"Possible Base64 {truncate(data)} decoded: {decoded_param}")
             self.find_ip(decoded_param)
 
         return decoded
