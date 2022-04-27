@@ -1,0 +1,31 @@
+{
+    "response": {
+        "supplementary": [
+            "88e0b861ae5519e6688f385de9a6e986de5589fe768522b8b13195749600e6fb"
+        ],
+        "extracted": [
+            "99c1d8ea308e2dba02bffc6dd0b6a78a3baecf7b34d1357c5b754204100006f5"
+        ]
+    },
+    "result": {
+        "heuristics": [
+            2,
+            3,
+            4
+        ],
+        "tags": {
+            "technique.macro": [
+                "Contains VBA Macro(s)"
+            ],
+            "network.static.uri": [
+                "http://ns.adobe.com/iX/1.0/",
+                "http://ns.adobe.com/xap/1.0/mm/",
+                "http://www.w3.org/1999/02/22-rdf-syntax-ns"
+            ],
+            "network.static.domain": [
+                "ns.adobe.com",
+                "www.w3.org"
+            ]
+        }
+    }
+}
