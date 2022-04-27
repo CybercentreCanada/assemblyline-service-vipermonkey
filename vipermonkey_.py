@@ -20,6 +20,7 @@ from assemblyline_v4_service.common.result import (
     Result,
     ResultSection,
 )
+from multidecoder.analyzers.shell import find_powershell_strings
 
 from vba_builtins import vba_builtins
 
@@ -124,12 +125,12 @@ class ViperMonkey(ServiceBase):
 
             # Read output
             if stdout:
-                for l in stdout.splitlines():
-                    if l.startswith(b"{") and l.endswith(b"}"):
+                for line in stdout.splitlines():
+                    if line.startswith(b"{") and line.endswith(b"}"):
                         try:
-                            output_results = json.loads(l)
+                            output_results = json.loads(line)
                         except UnicodeDecodeError:
-                            output_results = json.loads(l.decode("utf-8", "replace"))
+                            output_results = json.loads(line.decode("utf-8", "replace"))
                         break
 
                 # Checking for tuple in case vmonkey return is None
@@ -264,27 +265,31 @@ class ViperMonkey(ServiceBase):
             parameter: String to be searched
             section: Section to be modified if PowerShell found
         """
-        match = re.search(r"'([^']*\b(?:powershell|pwsh)\b[^']*)'", parameter, re.IGNORECASE)
-        if match:
-            powershell = match.group(1)
-        else:
-            return
-        self.found_powershell = True
-        sha256hash = hashlib.sha256(powershell.encode()).hexdigest()
-        powershell_filename = f"{sha256hash[0:25]}_extracted_powershell"
-        ResultSection(
-            "Discovered PowerShell code in parameter.",
-            parent=section,
-            body=powershell[:100] + f"... see [{powershell_filename}]",
-        )
 
-        # Add PowerShell code as extracted, account for duplicates
-        if sha256hash not in self.file_hashes:
-            self.file_hashes.append(sha256hash)
-            powershell_file_path = os.path.join(self.working_directory, powershell_filename)
-            with open(powershell_file_path, "w") as f:
-                f.write(powershell)
-            request.add_extracted(powershell_file_path, powershell_filename, "Discovered PowerShell code in parameter")
+        matches = find_powershell_strings(f'"{parameter}"'.encode())
+
+        if not matches:
+            return
+
+        self.found_powershell = True
+
+        for match in matches:
+            sha256hash = hashlib.sha256(match.value).hexdigest()
+            # Add PowerShell code as extracted, account for duplicates
+            if sha256hash not in self.file_hashes:
+                powershell_filename = f"{sha256hash[0:25]}_extracted_powershell"
+                ResultSection(
+                    "Discovered PowerShell code in parameter.",
+                    parent=section,
+                    body=match.value[:100].decode() + f"... see [{powershell_filename}]",
+                )
+                powershell_file_path = os.path.join(self.working_directory, powershell_filename)
+                with open(powershell_file_path, "wb") as f:
+                    f.write(match.value)
+                request.add_extracted(
+                    powershell_file_path, powershell_filename, "Discovered PowerShell code in parameter"
+                )
+                self.file_hashes.append(sha256hash)
 
     def find_ip(self, parameter: str) -> None:
         """
