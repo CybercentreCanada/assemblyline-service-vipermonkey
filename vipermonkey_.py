@@ -20,7 +20,7 @@ from assemblyline_v4_service.common.result import (
     Result,
     ResultSection,
 )
-from multidecoder.analyzers.shell import find_powershell_strings
+from multidecoder.analyzers.shell import find_powershell_strings, get_powershell_command
 
 from vba_builtins import vba_builtins
 
@@ -266,7 +266,7 @@ class ViperMonkey(ServiceBase):
             section: Section to be modified if PowerShell found
         """
 
-        matches = find_powershell_strings(f'"{parameter}"'.encode())
+        matches = find_powershell_strings(parameter.encode())
 
         if not matches:
             return
@@ -274,18 +274,19 @@ class ViperMonkey(ServiceBase):
         self.found_powershell = True
 
         for match in matches:
-            sha256hash = hashlib.sha256(match.value).hexdigest()
+            powershell_command = get_powershell_command(match.value)
+            sha256hash = hashlib.sha256(powershell_command).hexdigest()
             # Add PowerShell code as extracted, account for duplicates
             if sha256hash not in self.file_hashes:
-                powershell_filename = f"{sha256hash[0:25]}_extracted_powershell"
+                powershell_filename = f"{sha256hash[0:10]}.ps1"
                 ResultSection(
                     "Discovered PowerShell code in parameter.",
                     parent=section,
-                    body=match.value[:100].decode() + f"... see [{powershell_filename}]",
+                    body=powershell_command[:100].decode() + f"... see [{powershell_filename}]",
                 )
                 powershell_file_path = os.path.join(self.working_directory, powershell_filename)
                 with open(powershell_file_path, "wb") as f:
-                    f.write(match.value)
+                    f.write(powershell_command)
                 request.add_extracted(
                     powershell_file_path, powershell_filename, "Discovered PowerShell code in parameter"
                 )

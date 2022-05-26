@@ -1,1 +1,1 @@
-multidecoder
+multidecoder==0.0.11
