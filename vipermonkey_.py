@@ -9,7 +9,7 @@ from typing import IO, Any, Dict, List, Optional, Set, Union
 from urllib.parse import urlparse
 
 from assemblyline.common.str_utils import safe_str
-from assemblyline.odm import DOMAIN_REGEX, IP_ONLY_REGEX, IP_REGEX, URI_PATH
+from assemblyline.odm import DOMAIN_REGEX, IP_ONLY_REGEX, IPV4_REGEX, URI_PATH
 from assemblyline_v4_service.common.base import ServiceBase
 from assemblyline_v4_service.common.extractor.base64 import find_base64
 from assemblyline_v4_service.common.extractor.pe_file import find_pe_files
@@ -25,8 +25,8 @@ from multidecoder.analyzers.shell import find_powershell_strings, get_powershell
 from vba_builtins import vba_builtins
 
 PYTHON2_INTERPRETER = os.environ.get("PYTHON2_INTERPRETER", "pypy")
-R_URI = f"(?:(?:(?:https?|ftp):)?//)(?:\\S+(?::\\S*)?@)?(?:{IP_REGEX}|{DOMAIN_REGEX})(?::\\d{{2,5}})?{URI_PATH}?"
-R_IP = f"{IP_REGEX}(?::\\d{{1,4}})?"
+R_URI = f"(?:(?:(?:https?|ftp):)?//)(?:\\S+(?::\\S*)?@)?(?:{IPV4_REGEX}|{DOMAIN_REGEX})(?::\\d{{2,5}})?{URI_PATH}?"
+R_IP = f"{IPV4_REGEX}(?::\\d{{1,4}})?"
 
 FILE_PARAMETER_SIZE = 1000
 
@@ -299,15 +299,11 @@ class ViperMonkey(ServiceBase):
         Args:
             parameter: String to be searched
         """
-
-        url_list = re.findall(r"https?://(?:[-\w.]|(?:[\da-zA-Z/?=%&]))+", parameter)
-        ip_list = re.findall(R_IP, parameter)
-
-        for url in url_list:
+        for url in re.findall(r"https?://(?:[-\w.]|(?:[\da-zA-Z/?=%&]))+", parameter):
             url_strip = url.strip()
             if url_strip:
                 self.url_list.append(url_strip)
-        for ip in ip_list:
+        for ip in re.findall(R_IP, parameter):
             ip_strip = ip.strip()
             if ip_strip:
                 self.ip_list.append(ip_strip)
@@ -338,8 +334,8 @@ class ViperMonkey(ServiceBase):
             for ip in set(self.ip_list):
                 sec_iocs.add_line(ip)
                 # Checking if IP ports also found and adding the corresponding tags
-                if re.findall(":", ip):
-                    net_ip, net_port = ip.split(":")
+                if ":" in ip:
+                    net_ip, net_port = ip.rsplit(":", 1)
                     sec_iocs.add_tag("network.static.ip", net_ip)
                     sec_iocs.add_tag("network.port", net_port)
                 else:
