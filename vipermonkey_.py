@@ -53,9 +53,6 @@ class ViperMonkey(ServiceBase):
 
         self.result: Optional[Result] = None
 
-    def start(self) -> None:
-        self.log.debug("ViperMonkey service started")
-
     def execute(self, request: ServiceRequest) -> None:
         self.result = Result()
         request.result = self.result
