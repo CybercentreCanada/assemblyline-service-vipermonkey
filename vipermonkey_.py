@@ -1,3 +1,7 @@
+"""ViperMonkey Service"""
+
+from __future__ import annotations
+
 import hashlib
 import json
 import os
@@ -5,7 +9,7 @@ import re
 import subprocess
 import tempfile
 from codecs import BOM_UTF8, BOM_UTF16
-from typing import IO, Any, Dict, List, Optional, Set, Union
+from typing import IO, Any
 from urllib.parse import urlparse
 
 from assemblyline.common.str_utils import safe_str
@@ -31,7 +35,7 @@ R_IP = f"{IPV4_REGEX}(?::\\d{{1,4}})?"
 FILE_PARAMETER_SIZE = 1000
 
 
-def truncate(data: Union[bytes, str], length: int = 100) -> str:
+def truncate(data: bytes | str, length: int = 100) -> str:
     """Helper to avoid cluttering output"""
     string = safe_str(data)
     if len(string) > length:
@@ -39,19 +43,16 @@ def truncate(data: Union[bytes, str], length: int = 100) -> str:
     return string
 
 
-# noinspection PyBroadException
-
-
 class ViperMonkey(ServiceBase):
-    def __init__(self, config: Optional[Dict] = None) -> None:
+    def __init__(self, config: dict | None = None) -> None:
         super().__init__(config)
 
-        self.ip_list: List[str] = []
-        self.url_list: List[str] = []
+        self.ip_list: list[str] = []
+        self.url_list: list[str] = []
         self.found_powershell = False
-        self.file_hashes: List[str] = []
+        self.file_hashes: list[str] = []
 
-        self.result: Optional[Result] = None
+        self.result: Result | None = None
 
     def execute(self, request: ServiceRequest) -> None:
         self.result = Result()
@@ -63,22 +64,22 @@ class ViperMonkey(ServiceBase):
         self.file_hashes = []
 
         vmonkey_err = False
-        actions: List[str] = []
-        external_functions: List[str] = []
-        tmp_iocs: List[str] = []
-        output_results: Dict[str, Any] = {}
-        potential_base64: Set[str] = set()
+        actions: list[tuple[str, str, str]] = []
+        external_functions: list[str] = []
+        tmp_iocs: list[str] = []
+        output_results: dict[str, Any] = {}
+        potential_base64: set[str] = set()
 
         # Running ViperMonkey
         try:
             file_contents = request.file_contents
             input_file: str = request.file_path
-            input_file_obj: Optional[IO] = None
+            input_file_obj: IO | None = None
             # Typical start to XML files
             if not file_contents.startswith(b"<?") and request.file_type == "code/xml":
                 # Default encoding/decoding if BOM not found
-                encoding: Optional[str] = None
-                decoding: Optional[str] = None
+                encoding: str | None = None
+                decoding: str | None = None
                 # Remove potential BOMs from contents
                 if file_contents.startswith(BOM_UTF8):
                     encoding = "utf-8"
@@ -102,7 +103,7 @@ class ViperMonkey(ServiceBase):
                     self.working_directory,
                 ]
             )
-            p = subprocess.run(cmd, capture_output=True, shell=True)
+            p = subprocess.run(cmd, capture_output=True, shell=True, check=False)
             stdout = p.stdout
 
             # Close file
@@ -134,16 +135,14 @@ class ViperMonkey(ServiceBase):
                 # If no macros found, return is [][][], if error, return is None
                 # vmonkey_err can still happen if return is [][][], log as warning instead of error
                 if isinstance(output_results.get("vmonkey_values"), dict):
-                    """
-                    Structure of variable "actions" is as follows:
-                    [action, parameters, description]
-                    action: 'Found Entry Point', 'Execute Command', etc...
-                    parameters: Parameters for function
-                    description: 'Shell Function', etc...
-
-                    external_functions is a list of built-in VBA functions
-                    that were called
-                    """
+                    # Structure of variable "actions" is as follows:
+                    # [action, parameters, description]
+                    # action: 'Found Entry Point', 'Execute Command', etc...
+                    # parameters: Parameters for function
+                    # description: 'Shell Function', etc...
+                    #
+                    # external_functions is a list of built-in VBA functions
+                    # that were called
                     actions = output_results["vmonkey_values"]["actions"]
                     external_functions = output_results["vmonkey_values"]["external_funcs"]
                     tmp_iocs = output_results["vmonkey_values"]["tmp_iocs"]
@@ -156,13 +155,13 @@ class ViperMonkey(ServiceBase):
                 vmonkey_err = True
 
         except Exception:
-            self.log.exception(f"Vipermonkey failed to analyze file {request.sha256}")
+            self.log.exception("Vipermonkey failed to analyze file {}", request.sha256)
 
         if actions:
             # Creating action section
             action_section = ResultSection("Recorded Actions:", parent=self.result)
             action_section.add_tag("technique.macro", "Contains VBA Macro(s)")
-            sub_action_sections: Dict[str, ResultSection] = {}
+            sub_action_sections: dict[str, ResultSection] = {}
             for action, parameters, description in actions:  # Creating action sub-sections for each action
                 if not description:  # For actions with no description, just use the type of action
                     description = action
@@ -244,7 +243,7 @@ class ViperMonkey(ServiceBase):
         # Add vmonkey log as a supplemental file if we have results
         if "stdout" in output_results and (vmonkey_err or request.result.sections):
             temp_log_copy = os.path.join(tempfile.gettempdir(), f"{request.sid}_vipermonkey_output.log")
-            with open(temp_log_copy, "w") as temp_log_file:
+            with open(temp_log_copy, "w", encoding="utf-8") as temp_log_file:
                 temp_log_file.write(output_results["stdout"])
 
             request.add_supplementary(temp_log_copy, "vipermonkey_output.log", "ViperMonkey log output")
