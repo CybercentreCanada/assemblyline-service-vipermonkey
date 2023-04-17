@@ -363,6 +363,8 @@ class ViperMonkey(ServiceBase):
                 content = content.decode("utf-16").encode()
             except UnicodeDecodeError:
                 pass
+            if len(content) < 24:  # too many false positives
+                continue
             try:
                 if len(content) < FILE_PARAMETER_SIZE:
                     decoded_param = decoded_param[:start] + " " + content.decode(errors="ignore") + decoded_param[end:]
