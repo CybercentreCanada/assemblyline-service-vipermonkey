@@ -221,7 +221,7 @@ class ViperMonkey(ServiceBase):
             ResultSection("Discovered PowerShell code in file", parent=self.result, heuristic=Heuristic(3))
 
         # Check parameters and temp_iocs for base64
-        base64_section = ResultSection("Possible Base64 found", heuristic=Heuristic(5, frequency=0))
+        base64_section = ResultSection("Possible Base64 found", heuristic=Heuristic(5))
         for param in potential_base64:
             self.check_for_b64(param, base64_section, request, request.file_contents)
         if base64_section.body:
@@ -363,6 +363,8 @@ class ViperMonkey(ServiceBase):
                 content = content.decode("utf-16").encode()
             except UnicodeDecodeError:
                 pass
+            if len(content) < 24:  # too many false positives
+                continue
             try:
                 if len(content) < FILE_PARAMETER_SIZE:
                     decoded_param = decoded_param[:start] + " " + content.decode(errors="ignore") + decoded_param[end:]
@@ -389,7 +391,6 @@ class ViperMonkey(ServiceBase):
                 pass
 
         if decoded:
-            section.heuristic.increment_frequency()
             section.add_line(f"Possible Base64 {truncate(data)} decoded: {decoded_param}")
             self.find_ip(decoded_param)
 
