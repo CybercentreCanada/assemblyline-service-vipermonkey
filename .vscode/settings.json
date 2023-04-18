@@ -1,6 +1,8 @@
 {
     "pylint.args": [
-        "--logging-format-style=new"
+        "--logging-format-style=new",
+        "--max-line-length=120",
+        "--good-names=f,ip"
     ],
     "python.testing.pytestArgs": [
         "tests"

@@ -103,8 +103,8 @@ class ViperMonkey(ServiceBase):
                     self.working_directory,
                 ]
             )
-            p = subprocess.run(cmd, capture_output=True, shell=True, check=False)
-            stdout = p.stdout
+            process = subprocess.run(cmd, capture_output=True, shell=True, check=False)
+            stdout = process.stdout
 
             # Close file
             if input_file_obj and os.path.exists(input_file_obj.name):
@@ -118,8 +118,8 @@ class ViperMonkey(ServiceBase):
                         file_path = os.path.join(artifact_dir, file)
                         if os.path.isfile(file_path) and os.path.getsize(file_path):
                             request.add_extracted(file_path, file, "File extracted by ViperMonkey during analysis")
-                    except os.error as e:
-                        self.log.warning(e)
+                    except os.error as err:
+                        self.log.warning(err)
 
             # Read output
             if stdout:
