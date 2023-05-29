@@ -1,1 +1,2 @@
 multidecoder==0.0.11
+assemblyline-service-utilities
