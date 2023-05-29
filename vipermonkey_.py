@@ -14,18 +14,12 @@ from urllib.parse import urlparse
 
 from assemblyline.common.str_utils import safe_str
 from assemblyline.odm import DOMAIN_REGEX, IP_ONLY_REGEX, IPV4_REGEX, URI_PATH
+from assemblyline_service_utilities.common.extractor.base64 import find_base64
+from assemblyline_service_utilities.common.extractor.pe_file import find_pe_files
 from assemblyline_v4_service.common.base import ServiceBase
-from assemblyline_v4_service.common.extractor.base64 import find_base64
-from assemblyline_v4_service.common.extractor.pe_file import find_pe_files
 from assemblyline_v4_service.common.request import ServiceRequest
-from assemblyline_v4_service.common.result import (
-    BODY_FORMAT,
-    Heuristic,
-    Result,
-    ResultSection,
-)
+from assemblyline_v4_service.common.result import BODY_FORMAT, Heuristic, Result, ResultSection
 from multidecoder.analyzers.shell import find_powershell_strings, get_powershell_command
-
 from vba_builtins import vba_builtins
 
 PYTHON2_INTERPRETER = os.environ.get("PYTHON2_INTERPRETER", "pypy")
