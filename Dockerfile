@@ -23,6 +23,10 @@ RUN pypy -m pip install --no-cache-dir -U pip
 RUN pypy -m pip install colorlog==5.0.0 regex==2021.11.10
 # Temp replacement until upstream merges changes
 RUN pypy -m pip install --no-cache-dir -U https://github.com/cccs-jh/ViperMonkey/archive/kirk.zip
+
+# See https://github.com/yaml/pyyaml/issues/601
+RUN pypy -m pip install wheel
+RUN pypy -m pip install "Cython<3.0" pyyaml --no-build-isolation
 RUN pypy -m pip install --no-cache-dir assemblyline_v4_p2compat pyparsing==2.2.0
 
 ###############################
