@@ -53,6 +53,12 @@ heuristics:
     filetype: (document/.*|code/xml)
     description: Found possible Base64 parameter
 
+  - heur_id: 6
+    name: URLDownloadToFileA Found
+    score: 100
+    filetype: (document/.*|code/vbs)
+    description: URLDownloadToFileA function found by ViperMonkey
+
 docker_config:
   image: ${REGISTRY}cccs/assemblyline-service-vipermonkey:$SERVICE_TAG
   cpu_cores: 1
