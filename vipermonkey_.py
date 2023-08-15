@@ -45,6 +45,7 @@ class ViperMonkey(ServiceBase):
         self.url_list: list[str] = []
         self.found_powershell = False
         self.file_hashes: list[str] = []
+        self.urldownloadtofile = False
 
         self.result: Result | None = None
 
@@ -56,6 +57,7 @@ class ViperMonkey(ServiceBase):
         self.url_list = []
         self.found_powershell = False
         self.file_hashes = []
+        self.urldownloadtofile = False
 
         vmonkey_err = False
         actions: list[tuple[str, str, str]] = []
@@ -166,6 +168,9 @@ class ViperMonkey(ServiceBase):
                     sub_action_sections[description] = sub_action_section
                     if description == "Shell function":
                         sub_action_section.set_heuristic(2)
+                    elif description == "URLDownloadToFileA":
+                        sub_action_section.set_heuristic(6)
+                        self.urldownloadtofile = True
                 else:
                     # Reuse existing section
                     sub_action_section = sub_action_sections[description]
@@ -330,6 +335,9 @@ class ViperMonkey(ServiceBase):
                     sec_iocs.add_tag("network.port", net_port)
                 else:
                     sec_iocs.add_tag("network.static.ip", ip)
+
+            if self.urldownloadtofile:
+                sec_iocs.heuristic.add_signature_id("urldownloadtofile_ioc", 500)
 
     def check_for_b64(self, data: str, section: ResultSection, request: ServiceRequest, file_contents: bytes) -> bool:
         """Search and decode base64 strings in sample data.
