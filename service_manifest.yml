@@ -55,7 +55,7 @@ heuristics:
 
   - heur_id: 6
     name: URLDownloadToFileA Found
-    score: 100
+    score: 500
     filetype: (document/.*|code/vbs)
     description: URLDownloadToFileA function found by ViperMonkey
 

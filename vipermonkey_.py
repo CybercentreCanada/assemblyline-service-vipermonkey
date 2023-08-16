@@ -14,11 +14,12 @@ from urllib.parse import urlparse
 
 from assemblyline.common.str_utils import safe_str
 from assemblyline.odm import DOMAIN_REGEX, IP_ONLY_REGEX, IPV4_REGEX, URI_PATH
+from assemblyline_service_utilities.common.dynamic_service_helper import extract_iocs_from_text_blob
 from assemblyline_service_utilities.common.extractor.base64 import find_base64
 from assemblyline_service_utilities.common.extractor.pe_file import find_pe_files
 from assemblyline_v4_service.common.base import ServiceBase
 from assemblyline_v4_service.common.request import ServiceRequest
-from assemblyline_v4_service.common.result import BODY_FORMAT, Heuristic, Result, ResultSection
+from assemblyline_v4_service.common.result import BODY_FORMAT, Heuristic, Result, ResultSection, ResultTableSection
 from multidecoder.analyzers.shell import find_powershell_strings, get_powershell_command
 from vba_builtins import vba_builtins
 
@@ -45,7 +46,6 @@ class ViperMonkey(ServiceBase):
         self.url_list: list[str] = []
         self.found_powershell = False
         self.file_hashes: list[str] = []
-        self.urldownloadtofile = False
 
         self.result: Result | None = None
 
@@ -57,7 +57,6 @@ class ViperMonkey(ServiceBase):
         self.url_list = []
         self.found_powershell = False
         self.file_hashes = []
-        self.urldownloadtofile = False
 
         vmonkey_err = False
         actions: list[tuple[str, str, str]] = []
@@ -168,9 +167,6 @@ class ViperMonkey(ServiceBase):
                     sub_action_sections[description] = sub_action_section
                     if description == "Shell function":
                         sub_action_section.set_heuristic(2)
-                    elif description == "URLDownloadToFileA":
-                        sub_action_section.set_heuristic(6)
-                        self.urldownloadtofile = True
                 else:
                     # Reuse existing section
                     sub_action_section = sub_action_sections[description]
@@ -198,6 +194,13 @@ class ViperMonkey(ServiceBase):
                     sub_action_section.add_line(param)
                 else:
                     sub_action_section.add_line(f"Action: {action}, Parameters: {param}")
+
+                    if description == "URLDownloadToFileA":
+                        urldownload_ioc_sec = ResultTableSection("IOCs found in URLDownloadToFileA action")
+                        extract_iocs_from_text_blob(param, urldownload_ioc_sec, is_network_static=True)
+                        if urldownload_ioc_sec.body:
+                            urldownload_ioc_sec.set_heuristic(6)
+                            sub_action_section.add_subsection(urldownload_ioc_sec)
 
                 # Check later for base64
                 potential_base64.add(param)
@@ -335,9 +338,6 @@ class ViperMonkey(ServiceBase):
                     sec_iocs.add_tag("network.port", net_port)
                 else:
                     sec_iocs.add_tag("network.static.ip", ip)
-
-            if self.urldownloadtofile:
-                sec_iocs.heuristic.add_signature_id("urldownloadtofile_ioc", 500)
 
     def check_for_b64(self, data: str, section: ResultSection, request: ServiceRequest, file_contents: bytes) -> bool:
         """Search and decode base64 strings in sample data.
