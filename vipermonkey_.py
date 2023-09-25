@@ -14,11 +14,12 @@ from urllib.parse import urlparse
 
 from assemblyline.common.str_utils import safe_str
 from assemblyline.odm import DOMAIN_REGEX, IP_ONLY_REGEX, IPV4_REGEX, URI_PATH
+from assemblyline_service_utilities.common.dynamic_service_helper import extract_iocs_from_text_blob
 from assemblyline_service_utilities.common.extractor.base64 import find_base64
 from assemblyline_service_utilities.common.extractor.pe_file import find_pe_files
 from assemblyline_v4_service.common.base import ServiceBase
 from assemblyline_v4_service.common.request import ServiceRequest
-from assemblyline_v4_service.common.result import BODY_FORMAT, Heuristic, Result, ResultSection
+from assemblyline_v4_service.common.result import BODY_FORMAT, Heuristic, Result, ResultSection, ResultTableSection
 from multidecoder.analyzers.shell import find_powershell_strings, get_powershell_command
 from vba_builtins import vba_builtins
 
@@ -193,6 +194,13 @@ class ViperMonkey(ServiceBase):
                     sub_action_section.add_line(param)
                 else:
                     sub_action_section.add_line(f"Action: {action}, Parameters: {param}")
+
+                    if description == "URLDownloadToFileA":
+                        urldownload_ioc_sec = ResultTableSection("IOCs found in URLDownloadToFileA action")
+                        extract_iocs_from_text_blob(param, urldownload_ioc_sec, is_network_static=True)
+                        if urldownload_ioc_sec.body:
+                            urldownload_ioc_sec.set_heuristic(6)
+                            sub_action_section.add_subsection(urldownload_ioc_sec)
 
                 # Check later for base64
                 potential_base64.add(param)
