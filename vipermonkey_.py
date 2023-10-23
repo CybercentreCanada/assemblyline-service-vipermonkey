@@ -8,7 +8,6 @@ import os
 import re
 import subprocess
 import tempfile
-from codecs import BOM_UTF8, BOM_UTF16
 from typing import IO, Any
 from urllib.parse import urlparse
 
@@ -75,29 +74,8 @@ class ViperMonkey(ServiceBase):
 
         # Running ViperMonkey
         try:
-            file_contents = request.file_contents
             input_file: str = request.file_path
             input_file_obj: IO | None = None
-            # Typical start to XML files
-            if not file_contents.startswith(b"<?") and request.file_type == "code/xml":
-                # Default encoding/decoding if BOM not found
-                encoding: str | None = None
-                decoding: str | None = None
-                # Remove potential BOMs from contents
-                if file_contents.startswith(BOM_UTF8):
-                    encoding = "utf-8"
-                    decoding = "utf-8-sig"
-                elif file_contents.startswith(BOM_UTF16):
-                    encoding = "utf-16"
-                    decoding = "utf-16"
-                if encoding and decoding:
-                    input_file_obj = tempfile.NamedTemporaryFile("w+", encoding=encoding)
-                    input_file_obj.write(file_contents.decode(decoding, errors="ignore"))
-                    input_file = input_file_obj.name
-                else:
-                    # If the file_type was detected as XML, it's probably buried within but not actually an XML file
-                    # Give no response as ViperMonkey can't process this kind of file
-                    return
             cmd = " ".join(
                 [
                     PYTHON2_INTERPRETER,
