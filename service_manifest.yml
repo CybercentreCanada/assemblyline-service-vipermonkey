@@ -59,6 +59,18 @@ heuristics:
     filetype: (document/office/.*|code/vbs)
     description: URLDownloadToFileA function found by ViperMonkey
 
+  - heur_id: 7
+    name: WinHTTPRequest Found
+    score: 100
+    filetype: (document/office/.*|code/vbs)
+    description: WinHTTPRequest function found by ViperMonkey
+
+  - heur_id: 8
+    name: POST Found
+    score: 100
+    filetype: (document/office/.*|code/vbs)
+    description: POST function found by ViperMonkey
+
 docker_config:
   image: ${REGISTRY}cccs/assemblyline-service-vipermonkey:$SERVICE_TAG
   cpu_cores: 1

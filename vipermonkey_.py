@@ -19,6 +19,7 @@ from assemblyline_service_utilities.common.dynamic_service_helper import (
 )
 from assemblyline_service_utilities.common.extractor.base64 import find_base64
 from assemblyline_service_utilities.common.extractor.pe_file import find_pe_files
+from assemblyline_service_utilities.common.tag_helper import add_tag
 from assemblyline_v4_service.common.base import ServiceBase
 from assemblyline_v4_service.common.request import ServiceRequest
 from assemblyline_v4_service.common.result import (
@@ -209,6 +210,25 @@ class ViperMonkey(ServiceBase):
                         if urldownload_ioc_sec.body:
                             urldownload_ioc_sec.set_heuristic(6)
                             sub_action_section.add_subsection(urldownload_ioc_sec)
+
+                    elif action.lower() == "CreateObject".lower() and "WinHTTPRequest".lower() in param.lower():
+                        winhttpreq_heur = Heuristic(7)
+                        _ = ResultSection(
+                            winhttpreq_heur.name,
+                            winhttpreq_heur.description,
+                            heuristic=winhttpreq_heur,
+                            parent=sub_action_section,
+                        )
+
+                    elif action.lower() == "POST".lower():
+                        post_heur = Heuristic(8)
+                        post_sec = ResultSection(
+                            post_heur.name,
+                            post_heur.description,
+                            heuristic=post_heur,
+                            parent=sub_action_section,
+                        )
+                        _ = add_tag(post_sec, "network.static.uri", param)
 
                 # Check later for base64
                 potential_base64.add(param)
