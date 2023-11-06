@@ -51,12 +51,34 @@ jobs:
         fetchDepth: 1
         path: $(samples_location)
       - script: |
+          set -x # echo on
           [ ! -d "$(pwd)/tests" ] && echo "No tests found" && exit
           sudo apt-get update
           sudo apt-get install -y libfuzzy-dev libfuzzy2 wget apt-transport-https software-properties-common
           if [[ -f "$(pwd)/pkglist.txt" ]]; then
             grep -vE '^#' "$(pwd)/pkglist.txt" | xargs sudo apt install -y
           fi
+          # Performing ViperMonkey-specific setup
+          export pypy=pypy2.7-v7.3.3
+          # Install pypy
+          sudo apt-get update && sudo apt-get install -y wget bzip2 build-essential && rm -rf /var/lib/apt/lists/*
+          sudo wget -O /tmp/${pypy}-linux64.tar.bz2 https://downloads.python.org/pypy/${pypy}-linux64.tar.bz2
+          sudo tar -xvf /tmp/${pypy}-linux64.tar.bz2 -C /opt
+          sudo ln -s /opt/${pypy}-linux64/bin/pypy /usr/local/bin/pypy
+
+          # Install packages
+          sudo pypy -m ensurepip
+          sudo pypy -m pip install --no-cache-dir -U pip
+
+          sudo pypy -m pip install colorlog==5.0.0 regex==2021.11.10
+          # Temp replacement until upstream merges changes
+          sudo pypy -m pip install --no-cache-dir -U https://github.com/cccs-jh/ViperMonkey/archive/kirk.zip
+
+          # See https://github.com/yaml/pyyaml/issues/601
+          sudo pypy -m pip install wheel
+          sudo pypy -m pip install "Cython<3.0" pyyaml --no-build-isolation
+          sudo pypy -m pip install --no-cache-dir assemblyline_v4_p2compat pyparsing==2.2.0
+
           sudo rm -rf /var/lib/apt/lists/*
           sudo env "PATH=$PATH" python -m pip install -U --no-cache-dir assemblyline assemblyline_v4_service
           [ -f $(pwd)/requirements.txt ] && sudo env "PATH=$PATH" python -m pip install -U --no-cache-dir -r $(pwd)/requirements.txt
