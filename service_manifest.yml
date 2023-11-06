@@ -22,26 +22,26 @@ heuristics:
   - heur_id: 1
     name: ViperMonkey Error
     score: 1
-    filetype: (document/.*|code/xml)
+    filetype: (document/office/.*|code/vbs)
     description: ViperMonkey encountered an error
 
   - heur_id: 2
     name: Shell Function Found
     score: 100
     max_score: 500
-    filetype: (document/.*|code/xml)
+    filetype: (document/office/.*|code/vbs)
     description: Shell function found by ViperMonkey
 
   - heur_id: 3
     name: PowerShell Code Found
     score: 300
-    filetype: (document/.*|code/xml)
+    filetype: (document/office/.*|code/vbs)
     description: Discovered PowerShell code in file
 
   - heur_id: 4
     name: IOC Found
     score: 10
-    filetype: (document/.*|code/xml)
+    filetype: (document/office/.*|code/vbs)
     description: IOC found by ViperMonkey
 
   - heur_id: 5
@@ -50,13 +50,13 @@ heuristics:
     signature_score_map:
       possible_file: 500
       pe_file: 1000
-    filetype: (document/.*|code/xml)
+    filetype: (document/office/.*|code/vbs)
     description: Found possible Base64 parameter
 
   - heur_id: 6
     name: URLDownloadToFileA Found
     score: 500
-    filetype: (document/.*|code/vbs)
+    filetype: (document/office/.*|code/vbs)
     description: URLDownloadToFileA function found by ViperMonkey
 
 docker_config:
