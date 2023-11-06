@@ -1,0 +1,101 @@
+{
+  "extra": {
+    "drop_file": false,
+    "score": 0,
+    "sections": [
+      {
+        "auto_collapse": false,
+        "body": null,
+        "body_config": {},
+        "body_format": "TEXT",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": null,
+        "promote_to": null,
+        "tags": {
+          "technique": {
+            "macro": [
+              "Contains VBA Macro(s)"
+            ]
+          }
+        },
+        "title_text": "Recorded Actions:",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": "Action: Start Regular Emulation, Parameters: ",
+        "body_config": {},
+        "body_format": "TEXT",
+        "classification": "TLP:C",
+        "depth": 1,
+        "heuristic": null,
+        "promote_to": null,
+        "tags": {},
+        "title_text": "All wildcard matches will match",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": "Action: createobject, Parameters: ['WScript.Shell']\nAction: gSEdJDsfy5JGHKdggdh.run, Parameters: ['c:\\\\programdata\\\\uidpjewl.bat', 0, True]\nAction: Run, Parameters: bat\nAction: gSEdJDsfy5JGHKdggdh.run, Parameters: ['cmd /c start /B c:\\\\windows\\\\syswow64\\\\rundll32.exe c:\\\\programdata\\\\puihoud.dll,tjpleowdsyf', 0]\nAction: Run, Parameters: dll,tjpleowdsyf",
+        "body_config": {},
+        "body_format": "TEXT",
+        "classification": "TLP:C",
+        "depth": 1,
+        "heuristic": null,
+        "promote_to": null,
+        "tags": {},
+        "title_text": "Interesting Function Call",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": "Action: Object.Method Call, Parameters: ['c:\\\\programdata\\\\uidpjewl.bat', 0, True]\nAction: Object.Method Call, Parameters: ['cmd /c start /B c:\\\\windows\\\\syswow64\\\\rundll32.exe c:\\\\programdata\\\\puihoud.dll,tjpleowdsyf', 0]",
+        "body_config": {},
+        "body_format": "TEXT",
+        "classification": "TLP:C",
+        "depth": 1,
+        "heuristic": null,
+        "promote_to": null,
+        "tags": {},
+        "title_text": "gSEdJDsfy5JGHKdggdh.run",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": "createobject\nreplace",
+        "body_config": {},
+        "body_format": "MEMORY_DUMP",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": null,
+        "promote_to": null,
+        "tags": {},
+        "title_text": "VBA functions called",
+        "zeroize_on_tag_safe": false
+      }
+    ]
+  },
+  "files": {
+    "extracted": [],
+    "supplementary": [
+      {
+        "name": "vipermonkey_output.log",
+        "sha256": "94d3810ce0b551364f5573cf9de44a8f0e89b2323d3882622c6310d26bec4aed"
+      }
+    ]
+  },
+  "results": {
+    "heuristics": [],
+    "tags": {
+      "technique.macro": [
+        {
+          "heur_id": null,
+          "signatures": [],
+          "value": "Contains VBA Macro(s)"
+        }
+      ]
+    },
+    "temp_submission_data": {}
+  }
+}

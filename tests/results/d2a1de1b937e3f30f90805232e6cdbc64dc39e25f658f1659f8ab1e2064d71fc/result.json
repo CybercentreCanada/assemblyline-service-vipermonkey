@@ -1,0 +1,48 @@
+{
+  "extra": {
+    "drop_file": false,
+    "score": 1,
+    "sections": [
+      {
+        "auto_collapse": false,
+        "body": null,
+        "body_config": {},
+        "body_format": "TEXT",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": {
+          "attack_ids": [],
+          "frequency": 1,
+          "heur_id": 1,
+          "score": 1,
+          "score_map": {},
+          "signatures": {}
+        },
+        "promote_to": null,
+        "tags": {},
+        "title_text": "ViperMonkey has encountered an error, please check \"vipermonkey_output.log\"",
+        "zeroize_on_tag_safe": false
+      }
+    ]
+  },
+  "files": {
+    "extracted": [],
+    "supplementary": [
+      {
+        "name": "vipermonkey_output.log",
+        "sha256": "c445efc941a5367a809a0a0bcca2386187100c6d3b022bc1ec687c034d4660c0"
+      }
+    ]
+  },
+  "results": {
+    "heuristics": [
+      {
+        "attack_ids": [],
+        "heur_id": 1,
+        "signatures": []
+      }
+    ],
+    "tags": {},
+    "temp_submission_data": {}
+  }
+}
