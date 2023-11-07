@@ -213,7 +213,7 @@ class ViperMonkey(ServiceBase):
 
                     elif action.lower() == "CreateObject".lower() and "WinHTTPRequest".lower() in param.lower():
                         winhttpreq_heur = Heuristic(7)
-                        _ = ResultSection(
+                        ResultSection(
                             winhttpreq_heur.name,
                             winhttpreq_heur.description,
                             heuristic=winhttpreq_heur,
@@ -228,7 +228,7 @@ class ViperMonkey(ServiceBase):
                             heuristic=post_heur,
                             parent=sub_action_section,
                         )
-                        _ = add_tag(post_sec, "network.static.uri", param)
+                        add_tag(post_sec, "network.static.uri", param)
 
                 # Check later for base64
                 potential_base64.add(param)
