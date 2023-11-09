@@ -12,24 +12,22 @@ from codecs import BOM_UTF8, BOM_UTF16
 from typing import IO, Any
 from urllib.parse import urlparse
 
-from assemblyline.common.str_utils import safe_str
+from assemblyline.common.identify import CUSTOM_BATCH_ID, CUSTOM_PS1_ID
+from assemblyline.common.str_utils import truncate
 from assemblyline.odm import DOMAIN_REGEX, IP_ONLY_REGEX, IPV4_REGEX, URI_PATH
-from assemblyline_service_utilities.common.dynamic_service_helper import (
-    extract_iocs_from_text_blob,
-)
+from assemblyline_service_utilities.common.dynamic_service_helper import extract_iocs_from_text_blob
 from assemblyline_service_utilities.common.extractor.base64 import find_base64
 from assemblyline_service_utilities.common.extractor.pe_file import find_pe_files
 from assemblyline_service_utilities.common.tag_helper import add_tag
 from assemblyline_v4_service.common.base import ServiceBase
 from assemblyline_v4_service.common.request import ServiceRequest
-from assemblyline_v4_service.common.result import (
-    BODY_FORMAT,
-    Heuristic,
-    Result,
-    ResultSection,
-    ResultTableSection,
+from assemblyline_v4_service.common.result import BODY_FORMAT, Heuristic, Result, ResultSection, ResultTableSection
+from multidecoder.decoders.shell import (
+    find_cmd_strings,
+    find_powershell_strings,
+    get_cmd_command,
+    get_powershell_command,
 )
-from multidecoder.decoders.shell import find_powershell_strings, get_powershell_command
 from vba_builtins import vba_builtins
 
 PYTHON2_INTERPRETER = os.environ.get("PYTHON2_INTERPRETER", "pypy")
@@ -39,14 +37,6 @@ R_IP = f"{IPV4_REGEX}(?::\\d{{1,4}})?"
 FILE_PARAMETER_SIZE = 1000
 
 
-def truncate(data: bytes | str, length: int = 100) -> str:
-    """Helper to avoid cluttering output"""
-    string = safe_str(data)
-    if len(string) > length:
-        return string[:length] + "..."
-    return string
-
-
 class ViperMonkey(ServiceBase):
     def __init__(self, config: dict | None = None) -> None:
         super().__init__(config)
@@ -54,6 +44,7 @@ class ViperMonkey(ServiceBase):
         self.ip_list: list[str] = []
         self.url_list: list[str] = []
         self.found_powershell = False
+        self.found_command = False
         self.file_hashes: list[str] = []
 
         self.result: Result | None = None
@@ -65,6 +56,7 @@ class ViperMonkey(ServiceBase):
         self.ip_list = []
         self.url_list = []
         self.found_powershell = False
+        self.found_command = False
         self.file_hashes = []
 
         vmonkey_err = False
@@ -187,8 +179,7 @@ class ViperMonkey(ServiceBase):
                     for item in parameters:
                         # Parameters includes more than strings (booleans for example)
                         if isinstance(item, str):
-                            # Check for PowerShell
-                            self.extract_powershell(item, sub_action_section, request)
+                            self.extract_command(item, sub_action_section, request)
                     # Join list items into single string
                     param = ", ".join(str(p) for p in parameters)
 
@@ -196,39 +187,42 @@ class ViperMonkey(ServiceBase):
                     param = parameters
                     # Parameters includes more than strings (booleans for example)
                     if isinstance(param, str):
-                        self.extract_powershell(param, sub_action_section, request)
+                        self.extract_command(param, sub_action_section, request)
 
                 # If the description field was empty, re-organize result section for this case
                 if description == action:
                     sub_action_section.add_line(param)
                 else:
-                    sub_action_section.add_line(f"Action: {action}, Parameters: {param}")
+                    if not param:
+                        sub_action_section.add_line(f"Action: {action}, No Parameters")
+                    else:
+                        sub_action_section.add_line(f"Action: {action}, Parameters: {param}")
 
-                    if description == "URLDownloadToFileA":
-                        urldownload_ioc_sec = ResultTableSection("IOCs found in URLDownloadToFileA action")
-                        extract_iocs_from_text_blob(param, urldownload_ioc_sec, is_network_static=True)
-                        if urldownload_ioc_sec.body:
-                            urldownload_ioc_sec.set_heuristic(6)
-                            sub_action_section.add_subsection(urldownload_ioc_sec)
+                if description == "URLDownloadToFileA":
+                    urldownload_ioc_sec = ResultTableSection("IOCs found in URLDownloadToFileA action")
+                    extract_iocs_from_text_blob(param, urldownload_ioc_sec, is_network_static=True)
+                    if urldownload_ioc_sec.body:
+                        urldownload_ioc_sec.set_heuristic(6)
+                        sub_action_section.add_subsection(urldownload_ioc_sec)
 
-                    elif action.lower() == "CreateObject".lower() and "WinHTTPRequest".lower() in param.lower():
-                        winhttpreq_heur = Heuristic(7)
-                        ResultSection(
-                            winhttpreq_heur.name,
-                            winhttpreq_heur.description,
-                            heuristic=winhttpreq_heur,
-                            parent=sub_action_section,
-                        )
+                elif action.lower() == "CreateObject".lower() and "WinHTTPRequest".lower() in param.lower():
+                    winhttpreq_heur = Heuristic(7)
+                    ResultSection(
+                        winhttpreq_heur.name,
+                        winhttpreq_heur.description,
+                        heuristic=winhttpreq_heur,
+                        parent=sub_action_section,
+                    )
 
-                    elif action.lower() == "POST".lower():
-                        post_heur = Heuristic(8)
-                        post_sec = ResultSection(
-                            post_heur.name,
-                            post_heur.description,
-                            heuristic=post_heur,
-                            parent=sub_action_section,
-                        )
-                        add_tag(post_sec, "network.static.uri", param)
+                elif action.lower() == "POST".lower():
+                    post_heur = Heuristic(8)
+                    post_sec = ResultSection(
+                        post_heur.name,
+                        post_heur.description,
+                        heuristic=post_heur,
+                        parent=sub_action_section,
+                    )
+                    add_tag(post_sec, "network.static.uri", param)
 
                 # Check later for base64
                 potential_base64.add(param)
@@ -238,7 +232,7 @@ class ViperMonkey(ServiceBase):
         # Check tmp_iocs
         res_temp_iocs = ResultSection("Runtime temporary IOCs")
         for ioc in tmp_iocs:
-            self.extract_powershell(ioc, res_temp_iocs, request)
+            self.extract_command(ioc, res_temp_iocs, request)
             potential_base64.add(ioc)
             self.find_ip(ioc)
 
@@ -248,6 +242,10 @@ class ViperMonkey(ServiceBase):
         # Add PowerShell score/tag if found
         if self.found_powershell:
             ResultSection("Discovered PowerShell code in file", parent=self.result, heuristic=Heuristic(3))
+
+        # Add command score/tag if found
+        if self.found_command:
+            ResultSection("Discovered command line commands in file", parent=self.result, heuristic=Heuristic(9))
 
         # Check parameters and temp_iocs for base64
         base64_section = ResultSection("Possible Base64 found", heuristic=Heuristic(5))
@@ -284,39 +282,55 @@ class ViperMonkey(ServiceBase):
                     heuristic=Heuristic(1),
                 )
 
-    def extract_powershell(self, parameter: str, section: ResultSection, request: ServiceRequest) -> None:
-        """Searches parameter for PowerShell, adds as extracted if found
+    def extract_command(self, parameter: str, section: ResultSection, request: ServiceRequest) -> None:
+        """Searches parameter for command, adds as extracted if found
 
         Args:
             parameter: String to be searched
-            section: Section to be modified if PowerShell found
+            section: Section to be modified if command found
         """
 
-        matches = find_powershell_strings(parameter.encode())
+        ps1_matches = find_powershell_strings(parameter.encode())
+        cmd_matches = find_cmd_strings(parameter.encode())
 
-        if not matches:
+        if not ps1_matches and not cmd_matches:
             return
 
-        self.found_powershell = True
+        for matches, get_command_fn, match_type, file_extension, found, header in [
+            (ps1_matches, get_powershell_command, "PowerShell code", ".ps1", "found_powershell", CUSTOM_PS1_ID),
+            (cmd_matches, get_cmd_command, "command line commands", ".bat", "found_command", CUSTOM_BATCH_ID),
+        ]:
+            if not matches:
+                continue
 
-        for match in matches:
-            powershell_command = get_powershell_command(match.value)
-            sha256hash = hashlib.sha256(powershell_command).hexdigest()
-            # Add PowerShell code as extracted, account for duplicates
-            if sha256hash not in self.file_hashes:
-                powershell_filename = f"{sha256hash[0:10]}.ps1"
-                ResultSection(
-                    "Discovered PowerShell code in parameter.",
-                    parent=section,
-                    body=powershell_command[:100].decode() + f"... see [{powershell_filename}]",
-                )
-                powershell_file_path = os.path.join(self.working_directory, powershell_filename)
-                with open(powershell_file_path, "wb") as f:
-                    f.write(powershell_command)
-                request.add_extracted(
-                    powershell_file_path, powershell_filename, "Discovered PowerShell code in parameter"
-                )
-                self.file_hashes.append(sha256hash)
+            for match in matches:
+                command = get_command_fn(match.value)
+                if not command:
+                    continue
+
+                if not getattr(self, found):
+                    setattr(self, found, True)
+
+                sha256hash = hashlib.sha256(command).hexdigest()
+                # Add command as extracted, account for duplicates
+                if sha256hash not in self.file_hashes:
+                    command_filename = f"{sha256hash[0:10]}{file_extension}"
+                    ResultSection(
+                        f"Discovered {match_type} in parameter.",
+                        parent=section,
+                        body=truncate(command) + f"; See [{command_filename}]",
+                    )
+                    if b"**MATCH ANY**" not in match.value:
+                        section.add_tag("dynamic.process.command_line", match.value)
+
+                    file_path = os.path.join(self.working_directory, command_filename)
+                    with open(file_path, "wb") as f:
+                        file_content = header
+                        file_content += command
+                        f.write(file_content)
+                    self.log.debug(f"Extracted {match_type} to {file_path}")
+                    request.add_extracted(file_path, command_filename, f"Discovered {match_type} in parameter.")
+                    self.file_hashes.append(sha256hash)
 
     def find_ip(self, parameter: str) -> None:
         """
@@ -420,7 +434,7 @@ class ViperMonkey(ServiceBase):
                 pass
 
         if decoded:
-            section.add_line(f"Possible Base64 {truncate(data)} decoded: {decoded_param}")
+            section.add_line(f"Possible Base64 {truncate(data)} decoded: {truncate(decoded_param)}")
             self.find_ip(decoded_param)
 
         return decoded
