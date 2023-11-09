@@ -24,7 +24,7 @@
       },
       {
         "auto_collapse": false,
-        "body": "Action: Start Regular Emulation, Parameters: ",
+        "body": "Action: Start Regular Emulation, No Parameters",
         "body_config": {},
         "body_format": "TEXT",
         "classification": "TLP:C",
@@ -44,8 +44,29 @@
         "depth": 1,
         "heuristic": null,
         "promote_to": null,
-        "tags": {},
+        "tags": {
+          "dynamic": {
+            "process": {
+              "command_line": [
+                "cmd /c start /B c:\\\\windows\\\\syswow64\\\\rundll32.exe c:\\\\programdata\\\\puihoud.dll,tjpleowdsyf', 0]"
+              ]
+            }
+          }
+        },
         "title_text": "Interesting Function Call",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": "start /B c:\\\\windows\\\\syswow64\\\\rundll32.exe c:\\\\programdata\\\\puihoud.dll,tjpleowdsyf', 0]; See [6672026788.bat]",
+        "body_config": {},
+        "body_format": "TEXT",
+        "classification": "TLP:C",
+        "depth": 2,
+        "heuristic": null,
+        "promote_to": null,
+        "tags": {},
+        "title_text": "Discovered command line commands in parameter.",
         "zeroize_on_tag_safe": false
       },
       {
@@ -59,6 +80,26 @@
         "promote_to": null,
         "tags": {},
         "title_text": "gSEdJDsfy5JGHKdggdh.run",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": null,
+        "body_config": {},
+        "body_format": "TEXT",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": {
+          "attack_ids": [],
+          "frequency": 1,
+          "heur_id": 9,
+          "score": 0,
+          "score_map": {},
+          "signatures": {}
+        },
+        "promote_to": null,
+        "tags": {},
+        "title_text": "Discovered command line commands in file",
         "zeroize_on_tag_safe": false
       },
       {
@@ -77,7 +118,12 @@
     ]
   },
   "files": {
-    "extracted": [],
+    "extracted": [
+      {
+        "name": "6672026788.bat",
+        "sha256": "07b5598063337cb4a10277efb4de25e57e920281e39e4a24577429ecc6ee04f8"
+      }
+    ],
     "supplementary": [
       {
         "name": "vipermonkey_output.log",
@@ -86,8 +132,21 @@
     ]
   },
   "results": {
-    "heuristics": [],
+    "heuristics": [
+      {
+        "attack_ids": [],
+        "heur_id": 9,
+        "signatures": []
+      }
+    ],
     "tags": {
+      "dynamic.process.command_line": [
+        {
+          "heur_id": null,
+          "signatures": [],
+          "value": "cmd /c start /B c:\\\\windows\\\\syswow64\\\\rundll32.exe c:\\\\programdata\\\\puihoud.dll,tjpleowdsyf', 0]"
+        }
+      ],
       "technique.macro": [
         {
           "heur_id": null,
