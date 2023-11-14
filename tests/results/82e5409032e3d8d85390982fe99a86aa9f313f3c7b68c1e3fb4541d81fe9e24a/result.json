@@ -24,7 +24,7 @@
       },
       {
         "auto_collapse": false,
-        "body": "Action: Start Regular Emulation, Parameters: ",
+        "body": "Action: Start Regular Emulation, No Parameters",
         "body_config": {},
         "body_format": "TEXT",
         "classification": "TLP:C",

@@ -71,6 +71,12 @@ heuristics:
     filetype: (document/office/.*|code/vbs)
     description: POST function found by ViperMonkey
 
+  - heur_id: 9
+    name: Command Line Command Found
+    score: 0
+    filetype: (document/office/.*|code/vbs)
+    description: Discovered command line commands in file
+
 docker_config:
   image: ${REGISTRY}cccs/assemblyline-service-vipermonkey:$SERVICE_TAG
   cpu_cores: 1
