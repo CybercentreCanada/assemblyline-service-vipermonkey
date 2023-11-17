@@ -397,7 +397,7 @@ class ViperMonkey(ServiceBase):
         decoded = False
 
         encoded_data = data.encode()
-        for content, start, end in find_base64(encoded_data):
+        for content, start, end in sorted(find_base64(encoded_data), key=lambda x: x[0]):
             if encoded_data[start:end] in file_contents:
                 # Present in original file, not an intermediate IoC
                 continue
