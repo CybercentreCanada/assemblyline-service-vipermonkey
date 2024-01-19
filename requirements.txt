@@ -1,4 +1,4 @@
-assemblyline-service-utilities>=4.5,<4.6
+assemblyline-service-utilities==4.5.0.dev13
 # Multidecoder is also used by assemblyline-service-utilities
 # make sure that the version ranges are compatible
-multidecoder>=1
+#multidecoder>=1

@@ -19,3 +19,5 @@ th = TestHelper(service_class, RESULTS_FOLDER)
 @pytest.mark.parametrize("sample", th.result_list())
 def test_sample(sample):
     th.run_test_comparison(sample)
+
+th.regenerate_results()
