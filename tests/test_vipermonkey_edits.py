@@ -223,18 +223,12 @@ class TestService:
         assert "result1: 3" in str(test_result['result']['sections'])
         assert "result2: 2" in str(test_result['result']['sections'])
 
-    [15, 25, 35, 45, 55]
-    # test byref function calls
-    # should be treated as byref by default
+    # test byval function calls
     @staticmethod
-    @pytest.mark.parametrize("sample", ["ascii_xor.vbs"], indirect=True)
-    def test_ascii_xor(sample):
+    @pytest.mark.parametrize("sample", ["byval.vbs"], indirect=True)
+    def test_byval(sample):
 
         config = helper.get_service_attributes().config
-
-        f = open("/tmp/file.txt", "w")
-        f.write("ab31")
-        f.close()
 
         cls = service_class(config=config)
         cls.start()
@@ -245,10 +239,29 @@ class TestService:
         cls.execute(service_request)
 
         test_result = task.get_service_result()
-        os.remove("/tmp/file.txt")
-    
-        assert "ab31" in str(test_result['result']['sections'])
-        assert "result1: 3" in str(test_result['result']['sections'])
-        assert "result2: 2" in str(test_result['result']['sections'])
 
+        # array shouldnt be updated
+        assert "[5, 15, 25, 35, 45]" in str(test_result['result']['sections'])
+
+
+    # test byref function calls
+    # should be treated as byref by default in vbscript
+    @staticmethod
+    @pytest.mark.parametrize("sample", ["byref.vbs"], indirect=True)
+    def test_byref(sample):
+
+        config = helper.get_service_attributes().config
+
+        cls = service_class(config=config)
+        cls.start()
+
+        service_task = create_service_task(sample=sample)
+        task = Task(service_task)
+        service_request = ServiceRequest(task)
+        cls.execute(service_request)
+
+        test_result = task.get_service_result()
+
+
+        assert "[15, 25, 35, 45, 55]" in str(test_result['result']['sections'])
 
