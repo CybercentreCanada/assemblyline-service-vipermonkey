@@ -12,7 +12,6 @@ from assemblyline_v4_service.common.task import Task
 
 identify = forge.get_identify(use_cache=False)
 
-
 @pytest.fixture()
 def sample(request):
     sample_path = os.path.join("tests", "samples", request.param)
