@@ -27,7 +27,7 @@ from multidecoder.decoders.shell import (
     get_cmd_command,
     get_powershell_command,
 )
-from vba_builtins import vba_builtins
+from vipermonkey_.vba_builtins import vba_builtins
 
 PYTHON2_INTERPRETER = os.environ.get("PYTHON2_INTERPRETER", "pypy")
 R_URI = f"(?:(?:(?:https?|ftp):)?//)(?:\\S+(?::\\S*)?@)?(?:{IPV4_REGEX}|{DOMAIN_REGEX})(?::\\d{{2,5}})?{URI_PATH}?"
@@ -129,7 +129,7 @@ class ViperMonkey(ServiceBase):
                 vmonkey_err = True
 
         except Exception:
-            self.log.exception("Vipermonkey failed to analyze file {}", request.sha256)
+            self.log.exception("ViperMonkey failed to analyze file {}", request.sha256)
 
         if actions:
             # Creating action section
