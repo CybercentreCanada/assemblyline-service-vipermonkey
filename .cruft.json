@@ -8,15 +8,15 @@
       "__svc_name": "vipermonkey",
       "__repository": "assemblyline-service-vipermonkey",
       "__pkg_name": "vipermonkey",
-      "__class_name": "ViperMonkey",
       "short_description": "This service analyzes and emulates VBA macros contained in Microsoft Office files.",
-      "short_description_fr": "Ce service analyse et émule les macros VBA contenues dans les fichiers Microsoft Office.",
+      "short_description_fr": "Ce service analyse et \u00e9mule les macros VBA contenues dans les fichiers Microsoft Office.",
       "stage": "CORE",
       "category": "Static Analysis",
       "org_name_full": "CybercentreCanada",
       "org_name_short": "cccs",
       "license": "mit",
-      "_template": "https://github.com/CybercentreCanada/assemblyline-service-template.git"
+      "_template": "https://github.com/CybercentreCanada/assemblyline-service-template.git",
+      "class_name": "ViperMonkey"
     }
   },
   "directory": null
