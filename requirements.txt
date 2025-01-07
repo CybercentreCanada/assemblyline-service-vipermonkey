@@ -1,3 +1,5 @@
+assemblyline
+assemblyline-v4-service
 assemblyline-service-utilities>=4.5,<4.6
 # Multidecoder is also used by assemblyline-service-utilities
 # make sure that the version ranges are compatible

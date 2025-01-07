@@ -5,7 +5,6 @@ import pytest
 from assemblyline.common import forge
 from assemblyline_v4_service.common import helper
 from assemblyline.common.importing import load_module_by_path
-from assemblyline_service_utilities.testing.helper import TestHelper
 from assemblyline_v4_service.common.request import ServiceRequest
 from assemblyline.odm.messages.task import Task as ServiceTask
 from assemblyline_v4_service.common.task import Task
@@ -28,7 +27,7 @@ RESULTS_FOLDER = os.path.join(os.path.dirname(__file__), "results")
 SAMPLES_FOLDER = os.path.join(os.path.dirname(__file__), "samples")
 
 # Initialize test helper
-service_class = load_module_by_path("vipermonkey_.ViperMonkey", os.path.join(os.path.dirname(__file__), ".."))
+service_class = load_module_by_path("vipermonkey_.vipermonkey_.ViperMonkey", os.path.join(os.path.dirname(__file__), ".."))
 
 def create_service_task(sample):
     fileinfo_keys = ["magic", "md5", "mime", "sha1", "sha256", "size", "type"]
@@ -97,13 +96,13 @@ class TestService:
         test_result = task.get_service_result()
 
         print(test_result)
-        
+
         os.remove("/tmp/file.txt")
-        
+
         try:
             f = open(f"/tmp/{service_task.sid}_vipermonkey_output.log", "r")
             output_log = f.read()
-            
+
             assert "Debug Print          | 4" in output_log
         except FileNotFoundError:
             assert True == False # failed to read output log
@@ -129,14 +128,14 @@ class TestService:
         test_result = task.get_service_result()
 
         print(test_result['result']['sections'][4]['body'])
-            
+
         assert "['i', 'm', ' ', 'f', 'i', 'l', 'e', 'N', 'u', 'm', 'b', 'e', 'r', ','," in str(test_result['result']['sections'])
-    
+
     # test get# file read for a test.txt file
     @staticmethod
     @pytest.mark.parametrize("sample", ["getread_test.vbs"], indirect=True)
     def test_get_file_read_2(sample):
-        
+
         f = open("/tmp/file.txt", "w")
         f.write("aaaa")
         f.close()
@@ -153,9 +152,9 @@ class TestService:
 
         test_result = task.get_service_result()
         os.remove("/tmp/file.txt")
-            
+
         assert "aaaa" in str(test_result['result']['sections'])
-    
+
     # test regex and .FirstIndex
     @staticmethod
     @pytest.mark.parametrize("sample", ["regex_firstindex.vbs"], indirect=True)
@@ -172,7 +171,7 @@ class TestService:
         cls.execute(service_request)
 
         test_result = task.get_service_result()
-            
+
         assert "match: 3" in str(test_result['result']['sections'])
         assert "match: 8" in str(test_result['result']['sections'])
 
@@ -192,7 +191,7 @@ class TestService:
         cls.execute(service_request)
 
         test_result = task.get_service_result()
-            
+
         assert "result: 6" in str(test_result['result']['sections'])
 
 
@@ -217,7 +216,7 @@ class TestService:
 
         test_result = task.get_service_result()
         os.remove("/tmp/file.txt")
-    
+
         assert "ab31" in str(test_result['result']['sections'])
         assert "result1: 3" in str(test_result['result']['sections'])
         assert "result2: 2" in str(test_result['result']['sections'])
@@ -263,4 +262,3 @@ class TestService:
 
 
         assert "[15, 25, 35, 45, 55]" in str(test_result['result']['sections'])
-
