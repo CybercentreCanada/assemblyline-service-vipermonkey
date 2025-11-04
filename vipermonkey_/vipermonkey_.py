@@ -33,6 +33,11 @@ PYTHON2_INTERPRETER = os.environ.get("PYTHON2_INTERPRETER", "pypy")
 R_URI = f"(?:(?:(?:https?|ftp):)?//)(?:\\S+(?::\\S*)?@)?(?:{IPV4_REGEX}|{DOMAIN_REGEX})(?::\\d{{2,5}})?{URI_PATH}?"
 R_IP = f"{IPV4_REGEX}(?::\\d{{1,4}})?"
 
+# Optimization: Pre-compile regex patterns to avoid repeated compilation in hot paths
+R_URI_COMPILED = re.compile(R_URI)
+R_IP_COMPILED = re.compile(R_IP)
+URL_PATTERN = re.compile(r"https?://(?:[-\w.]|(?:[\da-zA-Z/?=%&]))+")
+
 FILE_PARAMETER_SIZE = 1000
 
 
@@ -317,11 +322,11 @@ class ViperMonkey(ServiceBase):
         Args:
             parameter: String to be searched
         """
-        for url in re.findall(r"https?://(?:[-\w.]|(?:[\da-zA-Z/?=%&]))+", parameter):
+        for url in URL_PATTERN.findall(parameter):
             url_strip = url.strip()
             if url_strip:
                 self.url_list.append(url_strip)
-        for ip in re.findall(R_IP, parameter):
+        for ip in R_IP_COMPILED.findall(parameter):
             ip_strip = ip.strip()
             if ip_strip:
                 self.ip_list.append(ip_strip)
