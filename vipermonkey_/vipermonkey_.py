@@ -8,7 +8,7 @@ import os
 import re
 import subprocess
 import tempfile
-from typing import IO, Any
+from typing import Any
 from urllib.parse import urlparse
 
 from assemblyline.common.identify import CUSTOM_BATCH_ID, CUSTOM_PS1_ID
@@ -45,11 +45,11 @@ class ViperMonkey(ServiceBase):
     def __init__(self, config: dict | None = None) -> None:
         super().__init__(config)
 
-        self.ip_list: list[str] = []
-        self.url_list: list[str] = []
+        self.ip_set: set[str] = set()
+        self.url_set: set[str] = set()
         self.found_powershell = False
         self.found_command = False
-        self.file_hashes: list[str] = []
+        self.file_hashes: set[str] = set()
 
         self.result: Result | None = None
 
@@ -57,11 +57,11 @@ class ViperMonkey(ServiceBase):
         self.result = Result()
         request.result = self.result
 
-        self.ip_list = []
-        self.url_list = []
+        self.ip_set = set()
+        self.url_set = set()
         self.found_powershell = False
         self.found_command = False
-        self.file_hashes = []
+        self.file_hashes = set()
 
         vmonkey_err = False
         actions: list[tuple[str, str, str]] = []
@@ -73,21 +73,14 @@ class ViperMonkey(ServiceBase):
         # Running ViperMonkey
         try:
             input_file: str = request.file_path
-            input_file_obj: IO | None = None
-            cmd = " ".join(
-                [
-                    PYTHON2_INTERPRETER,
-                    os.path.join(os.path.dirname(__file__), "vipermonkey_compat.py2"),
-                    input_file,
-                    self.working_directory,
-                ]
-            )
-            process = subprocess.run(cmd, capture_output=True, shell=True, check=False)
+            cmd = [
+                PYTHON2_INTERPRETER,
+                os.path.join(os.path.dirname(__file__), "vipermonkey_compat.py2"),
+                input_file,
+                self.working_directory,
+            ]
+            process = subprocess.run(cmd, capture_output=True, check=False)
             stdout = process.stdout
-
-            # Close file
-            if input_file_obj and os.path.exists(input_file_obj.name):
-                input_file_obj.close()
 
             # Add artifacts
             artifact_dir = os.path.join(self.working_directory, os.path.basename(input_file) + "_artifacts")
@@ -188,7 +181,7 @@ class ViperMonkey(ServiceBase):
                         urldownload_ioc_sec.set_heuristic(6)
                         sub_action_section.add_subsection(urldownload_ioc_sec)
 
-                elif action.lower() == "CreateObject".lower() and "WinHTTPRequest".lower() in param.lower():
+                elif action.lower() == "createobject" and "winhttprequest" in param.lower():
                     winhttpreq_heur = Heuristic(7)
                     ResultSection(
                         winhttpreq_heur.name,
@@ -197,7 +190,7 @@ class ViperMonkey(ServiceBase):
                         parent=sub_action_section,
                     )
 
-                elif action.lower() == "POST".lower():
+                elif action.lower() == "post":
                     post_heur = Heuristic(8)
                     post_sec = ResultSection(
                         post_heur.name,
@@ -232,8 +225,10 @@ class ViperMonkey(ServiceBase):
 
         # Check parameters and temp_iocs for base64
         base64_section = ResultSection("Possible Base64 found", heuristic=Heuristic(5))
+        file_contents = request.file_contents
         for param in potential_base64:
-            self.check_for_b64(param, base64_section, request, request.file_contents)
+            self.check_for_b64(param, base64_section, request, file_contents)
+        del file_contents
         if base64_section.body:
             self.result.add_section(base64_section)
 
@@ -313,7 +308,7 @@ class ViperMonkey(ServiceBase):
                         f.write(file_content)
                     self.log.debug(f"Extracted {match_type} to {file_path}")
                     request.add_extracted(file_path, command_filename, f"Discovered {match_type} in parameter.")
-                    self.file_hashes.append(sha256hash)
+                    self.file_hashes.add(sha256hash)
 
     def find_ip(self, parameter: str) -> None:
         """
@@ -325,24 +320,24 @@ class ViperMonkey(ServiceBase):
         for url in URL_PATTERN.findall(parameter):
             url_strip = url.strip()
             if url_strip:
-                self.url_list.append(url_strip)
+                self.url_set.add(url_strip)
         for ip in R_IP_COMPILED.findall(parameter):
             ip_strip = ip.strip()
             if ip_strip:
-                self.ip_list.append(ip_strip)
+                self.ip_set.add(ip_strip)
 
     def add_ip_tags(self) -> None:
         """
         Adds tags for urls and ip addresses from given lists
         """
 
-        if self.url_list or self.ip_list:
+        if self.url_set or self.ip_set:
             sec_iocs = ResultSection(
                 "ViperMonkey has found the following IOCs:", parent=self.result, heuristic=Heuristic(4)
             )
 
             # Add Urls
-            for url in set(self.url_list):
+            for url in self.url_set:
                 sec_iocs.add_line(url)
                 sec_iocs.add_tag("network.static.uri", url)
                 try:
@@ -354,7 +349,7 @@ class ViperMonkey(ServiceBase):
                     pass
 
             # Add IPs
-            for ip in set(self.ip_list):
+            for ip in self.ip_set:
                 sec_iocs.add_line(ip)
                 # Checking if IP ports also found and adding the corresponding tags
                 if ":" in ip:

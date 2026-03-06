@@ -65,9 +65,11 @@ if __name__ == "__main__":
             my_stdout.flush()
             my_stdout.seek(0)
             stdout = my_stdout.read()
+            my_stdout.close()
             my_stderr.flush()
             my_stderr.seek(0)
             stderr = my_stderr.read()
+            my_stderr.close()
 
             vmonkey_error = None
             if vmonkey_values is None:
