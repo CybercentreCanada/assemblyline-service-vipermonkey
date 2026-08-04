@@ -6,9 +6,10 @@ import hashlib
 import json
 import os
 import re
+import signal
 import subprocess
 import tempfile
-from typing import IO, Any
+from typing import Any
 from urllib.parse import urlparse
 
 from assemblyline.common.identify import CUSTOM_BATCH_ID, CUSTOM_PS1_ID
@@ -33,18 +34,29 @@ PYTHON2_INTERPRETER = os.environ.get("PYTHON2_INTERPRETER", "pypy")
 R_URI = f"(?:(?:(?:https?|ftp):)?//)(?:\\S+(?::\\S*)?@)?(?:{IPV4_REGEX}|{DOMAIN_REGEX})(?::\\d{{2,5}})?{URI_PATH}?"
 R_IP = f"{IPV4_REGEX}(?::\\d{{1,4}})?"
 
+# Optimization: Pre-compile regex patterns to avoid repeated compilation in hot paths
+R_URI_COMPILED = re.compile(R_URI)
+R_IP_COMPILED = re.compile(R_IP)
+URL_PATTERN = re.compile(r"https?://(?:[-\w.]|(?:[\da-zA-Z/?=%&]))+")
+
 FILE_PARAMETER_SIZE = 1000
+
+# Leave headroom under the AL service timeout so the framework can still
+# finalize the task after we kill a wedged pypy child.
+SUBPROCESS_TIMEOUT_BUFFER = 30
+# Absolute floor so we never pass a non-positive timeout to subprocess.
+MIN_SUBPROCESS_TIMEOUT = 30
 
 
 class ViperMonkey(ServiceBase):
     def __init__(self, config: dict | None = None) -> None:
         super().__init__(config)
 
-        self.ip_list: list[str] = []
-        self.url_list: list[str] = []
+        self.ip_set: set[str] = set()
+        self.url_set: set[str] = set()
         self.found_powershell = False
         self.found_command = False
-        self.file_hashes: list[str] = []
+        self.file_hashes: set[str] = set()
 
         self.result: Result | None = None
 
@@ -52,11 +64,11 @@ class ViperMonkey(ServiceBase):
         self.result = Result()
         request.result = self.result
 
-        self.ip_list = []
-        self.url_list = []
+        self.ip_set = set()
+        self.url_set = set()
         self.found_powershell = False
         self.found_command = False
-        self.file_hashes = []
+        self.file_hashes = set()
 
         vmonkey_err = False
         actions: list[tuple[str, str, str]] = []
@@ -68,21 +80,51 @@ class ViperMonkey(ServiceBase):
         # Running ViperMonkey
         try:
             input_file: str = request.file_path
-            input_file_obj: IO | None = None
-            cmd = " ".join(
-                [
-                    PYTHON2_INTERPRETER,
-                    os.path.join(os.path.dirname(__file__), "vipermonkey_compat.py2"),
-                    input_file,
-                    self.working_directory,
-                ]
+            cmd = [
+                PYTHON2_INTERPRETER,
+                os.path.join(os.path.dirname(__file__), "vipermonkey_compat.py2"),
+                input_file,
+                self.working_directory,
+            ]
+            # Hard-cap the pypy child. Without this, pathological VBA samples can
+            # pin a worker for days while AL healthz still reports healthy, which
+            # freezes the service queue and eventually the whole pipeline.
+            #
+            # Use Popen + process group so we can SIGKILL the whole tree on
+            # timeout (subprocess.run's TimeoutExpired has no pid, and a lone
+            # kill of the leader can leave pypy grandchildren running).
+            service_timeout = int(getattr(self.service_attributes, "timeout", 300) or 300)
+            subprocess_timeout = max(MIN_SUBPROCESS_TIMEOUT, service_timeout - SUBPROCESS_TIMEOUT_BUFFER)
+            stdout = b""
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                start_new_session=True,
             )
-            process = subprocess.run(cmd, capture_output=True, shell=True, check=False)
-            stdout = process.stdout
-
-            # Close file
-            if input_file_obj and os.path.exists(input_file_obj.name):
-                input_file_obj.close()
+            try:
+                stdout, _stderr = proc.communicate(timeout=subprocess_timeout)
+            except subprocess.TimeoutExpired:
+                vmonkey_err = True
+                self.log.warning(
+                    "ViperMonkey subprocess timed out after %ss (service timeout=%ss); "
+                    "killing process group and continuing with partial/empty output",
+                    subprocess_timeout,
+                    service_timeout,
+                )
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except (ProcessLookupError, PermissionError, OSError):
+                    try:
+                        proc.kill()
+                    except OSError:
+                        pass
+                try:
+                    stdout, _stderr = proc.communicate(timeout=5)
+                except Exception:
+                    stdout = b""
+                if stdout is None:
+                    stdout = b""
 
             # Add artifacts
             artifact_dir = os.path.join(self.working_directory, os.path.basename(input_file) + "_artifacts")
@@ -183,7 +225,7 @@ class ViperMonkey(ServiceBase):
                         urldownload_ioc_sec.set_heuristic(6)
                         sub_action_section.add_subsection(urldownload_ioc_sec)
 
-                elif action.lower() == "CreateObject".lower() and "WinHTTPRequest".lower() in param.lower():
+                elif action.lower() == "createobject" and "winhttprequest" in param.lower():
                     winhttpreq_heur = Heuristic(7)
                     ResultSection(
                         winhttpreq_heur.name,
@@ -192,7 +234,7 @@ class ViperMonkey(ServiceBase):
                         parent=sub_action_section,
                     )
 
-                elif action.lower() == "POST".lower():
+                elif action.lower() == "post":
                     post_heur = Heuristic(8)
                     post_sec = ResultSection(
                         post_heur.name,
@@ -227,8 +269,10 @@ class ViperMonkey(ServiceBase):
 
         # Check parameters and temp_iocs for base64
         base64_section = ResultSection("Possible Base64 found", heuristic=Heuristic(5))
+        file_contents = request.file_contents
         for param in potential_base64:
-            self.check_for_b64(param, base64_section, request, request.file_contents)
+            self.check_for_b64(param, base64_section, request, file_contents)
+        del file_contents
         if base64_section.body:
             self.result.add_section(base64_section)
 
@@ -308,7 +352,7 @@ class ViperMonkey(ServiceBase):
                         f.write(file_content)
                     self.log.debug(f"Extracted {match_type} to {file_path}")
                     request.add_extracted(file_path, command_filename, f"Discovered {match_type} in parameter.")
-                    self.file_hashes.append(sha256hash)
+                    self.file_hashes.add(sha256hash)
 
     def find_ip(self, parameter: str) -> None:
         """
@@ -317,27 +361,27 @@ class ViperMonkey(ServiceBase):
         Args:
             parameter: String to be searched
         """
-        for url in re.findall(r"https?://(?:[-\w.]|(?:[\da-zA-Z/?=%&]))+", parameter):
+        for url in URL_PATTERN.findall(parameter):
             url_strip = url.strip()
             if url_strip:
-                self.url_list.append(url_strip)
-        for ip in re.findall(R_IP, parameter):
+                self.url_set.add(url_strip)
+        for ip in R_IP_COMPILED.findall(parameter):
             ip_strip = ip.strip()
             if ip_strip:
-                self.ip_list.append(ip_strip)
+                self.ip_set.add(ip_strip)
 
     def add_ip_tags(self) -> None:
         """
         Adds tags for urls and ip addresses from given lists
         """
 
-        if self.url_list or self.ip_list:
+        if self.url_set or self.ip_set:
             sec_iocs = ResultSection(
                 "ViperMonkey has found the following IOCs:", parent=self.result, heuristic=Heuristic(4)
             )
 
             # Add Urls
-            for url in set(self.url_list):
+            for url in self.url_set:
                 sec_iocs.add_line(url)
                 sec_iocs.add_tag("network.static.uri", url)
                 try:
@@ -349,7 +393,7 @@ class ViperMonkey(ServiceBase):
                     pass
 
             # Add IPs
-            for ip in set(self.ip_list):
+            for ip in self.ip_set:
                 sec_iocs.add_line(ip)
                 # Checking if IP ports also found and adding the corresponding tags
                 if ":" in ip:
