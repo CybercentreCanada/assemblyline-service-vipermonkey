@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import re
+import signal
 import subprocess
 import tempfile
 from typing import Any
@@ -39,6 +40,12 @@ R_IP_COMPILED = re.compile(R_IP)
 URL_PATTERN = re.compile(r"https?://(?:[-\w.]|(?:[\da-zA-Z/?=%&]))+")
 
 FILE_PARAMETER_SIZE = 1000
+
+# Leave headroom under the AL service timeout so the framework can still
+# finalize the task after we kill a wedged pypy child.
+SUBPROCESS_TIMEOUT_BUFFER = 30
+# Absolute floor so we never pass a non-positive timeout to subprocess.
+MIN_SUBPROCESS_TIMEOUT = 30
 
 
 class ViperMonkey(ServiceBase):
@@ -79,8 +86,45 @@ class ViperMonkey(ServiceBase):
                 input_file,
                 self.working_directory,
             ]
-            process = subprocess.run(cmd, capture_output=True, check=False)
-            stdout = process.stdout
+            # Hard-cap the pypy child. Without this, pathological VBA samples can
+            # pin a worker for days while AL healthz still reports healthy, which
+            # freezes the service queue and eventually the whole pipeline.
+            #
+            # Use Popen + process group so we can SIGKILL the whole tree on
+            # timeout (subprocess.run's TimeoutExpired has no pid, and a lone
+            # kill of the leader can leave pypy grandchildren running).
+            service_timeout = int(getattr(self.service_attributes, "timeout", 300) or 300)
+            subprocess_timeout = max(MIN_SUBPROCESS_TIMEOUT, service_timeout - SUBPROCESS_TIMEOUT_BUFFER)
+            stdout = b""
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                start_new_session=True,
+            )
+            try:
+                stdout, _stderr = proc.communicate(timeout=subprocess_timeout)
+            except subprocess.TimeoutExpired:
+                vmonkey_err = True
+                self.log.warning(
+                    "ViperMonkey subprocess timed out after %ss (service timeout=%ss); "
+                    "killing process group and continuing with partial/empty output",
+                    subprocess_timeout,
+                    service_timeout,
+                )
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except (ProcessLookupError, PermissionError, OSError):
+                    try:
+                        proc.kill()
+                    except OSError:
+                        pass
+                try:
+                    stdout, _stderr = proc.communicate(timeout=5)
+                except Exception:
+                    stdout = b""
+                if stdout is None:
+                    stdout = b""
 
             # Add artifacts
             artifact_dir = os.path.join(self.working_directory, os.path.basename(input_file) + "_artifacts")
