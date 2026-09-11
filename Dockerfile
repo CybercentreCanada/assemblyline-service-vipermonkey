@@ -1,5 +1,5 @@
 ARG branch=latest
-FROM cccs/assemblyline-v4-service-base:$branch as base
+FROM cccs/assemblyline-rust-service-base:$branch as base
 
 ENV SERVICE_PATH vipermonkey_.vipermonkey_.ViperMonkey
 ENV pypy pypy2.7-v7.3.3
